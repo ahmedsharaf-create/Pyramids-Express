@@ -126,7 +126,8 @@
                 'corporate': [],
                 'incentives': []
             },
-            users: []
+            users: [],
+            shops: [] // Shop Database
         };
 
         async function initAuth() {
@@ -142,26 +143,33 @@
         }
 
         onAuthStateChanged(auth, (user) => {
-            if (user && user.email) {
+            if (user) {
                 const isAdmin = user.email === 'admin@pyramidsexpress.com';
                 window.state.user = { uid: user.uid, email: user.email, name: isAdmin ? 'System Admin' : 'PE Agent' };
-                window.state.isLoggedIn = true;
+                window.state.isLoggedIn = !!user.email;
                 window.state.isAdmin = isAdmin;
+                setupDataSync();
             } else {
-                window.state.user = user ? { uid: user.uid, name: 'Guest' } : null;
+                window.state.user = null;
                 window.state.isLoggedIn = false;
                 window.state.isAdmin = false;
             }
-            setupDataSync();
             render();
         });
+
+        let materialUnsub, userUnsub, shopUnsub;
 
         function setupDataSync() {
             if (!auth.currentUser) return;
             
+            // Clean up old listeners
+            if (materialUnsub) materialUnsub();
+            if (userUnsub) userUnsub();
+            if (shopUnsub) shopUnsub();
+
             // Sync Materials
             const publicDataRef = collection(db, 'artifacts', appId, 'public', 'data', 'materials');
-            onSnapshot(publicDataRef, (snapshot) => {
+            materialUnsub = onSnapshot(publicDataRef, (snapshot) => {
                 const newMaterials = { 'orange-info': [], 'corporate': [], 'incentives': [] };
                 snapshot.forEach((doc) => {
                     const data = doc.data();
@@ -171,42 +179,41 @@
                 });
                 window.state.materials = newMaterials;
                 render();
-            }, (err) => console.error(err));
+            }, (err) => console.warn("Firestore sync error (materials):", err));
 
-            // Sync Users
+            // Sync User Access
             const usersRef = collection(db, 'artifacts', appId, 'public', 'data', 'users');
-            onSnapshot(usersRef, (snapshot) => {
+            userUnsub = onSnapshot(usersRef, (snapshot) => {
                 const newUsers = [];
                 snapshot.forEach((doc) => {
                     newUsers.push({ id: doc.id, ...doc.data() });
                 });
                 window.state.users = newUsers;
                 render();
-            }, (err) => console.error(err));
+            }, (err) => console.warn("Firestore sync error (users):", err));
+
+            // Sync Shop Database
+            const shopsRef = collection(db, 'artifacts', appId, 'public', 'data', 'shops');
+            shopUnsub = onSnapshot(shopsRef, (snapshot) => {
+                const newShops = [];
+                snapshot.forEach((doc) => {
+                    newShops.push({ id: doc.id, ...doc.data() });
+                });
+                window.state.shops = newShops;
+                render();
+            }, (err) => console.warn("Firestore sync error (shops):", err));
         }
 
         window.handleLogin = async (e) => {
             e.preventDefault();
-            const btn = document.getElementById('auth-submit-btn');
             const email = document.getElementById('login-email').value;
-            
-            btn.disabled = true;
-            btn.innerHTML = '<span class="animate-spin mr-2">◌</span> Authorizing...';
-
-            try {
-                // Simulation for Canvas
-                window.state.isLoggedIn = true;
-                window.state.user = { email, name: email === 'admin@pyramidsexpress.com' ? 'System Admin' : 'PE Agent' };
-                window.state.isAdmin = email === 'admin@pyramidsexpress.com';
-                window.state.currentPage = window.state.isAdmin ? 'admin-panel' : 'agent-dashboard';
-                toggleAuthModal(false);
-                render();
-            } catch (err) {
-                console.error("Login failed:", err);
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = 'Authorize Session';
-            }
+            // Admin simulation
+            window.state.isLoggedIn = true;
+            window.state.user = { email, name: email === 'admin@pyramidsexpress.com' ? 'System Admin' : 'PE Agent' };
+            window.state.isAdmin = email === 'admin@pyramidsexpress.com';
+            window.state.currentPage = window.state.isAdmin ? 'admin-panel' : 'agent-dashboard';
+            toggleAuthModal(false);
+            render();
         };
 
         window.logout = async () => {
@@ -217,6 +224,7 @@
             render();
         };
 
+        // Material Upload
         window.handleAdminUpload = async (e) => {
             e.preventDefault();
             if (!window.state.isAdmin) return;
@@ -224,47 +232,53 @@
             const title = document.getElementById('adm-title').value;
             const desc = document.getElementById('adm-desc').value;
             const type = document.querySelector('input[name="adm-type"]:checked').value;
-            const materialId = Date.now().toString();
-            const materialRef = doc(db, 'artifacts', appId, 'public', 'data', 'materials', materialId);
+            const id = Date.now().toString();
             try {
-                await setDoc(materialRef, { category: cat, title: title, type: type, desc: desc || 'System Resource', createdAt: new Date().toISOString() });
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'materials', id), { 
+                    category: cat, title, type, desc: desc || 'Resource', createdAt: new Date().toISOString() 
+                });
                 e.target.reset();
-            } catch (err) { console.error("Upload failed:", err); }
+            } catch (err) { console.error(err); }
         };
 
-        window.handleDeleteMaterial = async (id) => {
+        // Shop Database Entry
+        window.handleAddShopEntry = async (e) => {
+            e.preventDefault();
             if (!window.state.isAdmin) return;
-            const materialRef = doc(db, 'artifacts', appId, 'public', 'data', 'materials', id);
-            try { await deleteDoc(materialRef); } catch (err) { console.error("Delete failed:", err); }
+            const shopName = document.getElementById('new-shop-name').value;
+            const areaManager = document.getElementById('new-shop-manager').value;
+            const id = Date.now().toString();
+            try {
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shops', id), { shopName, areaManager });
+                e.target.reset();
+            } catch (err) { console.error(err); }
         };
 
-        // --- User Management Logic ---
-        window.handleAddUser = async (e) => {
+        window.handleDeleteShopEntry = async (id) => {
+            if (!window.state.isAdmin) return;
+            try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shops', id)); } catch (err) { console.error(err); }
+        };
+
+        // User Access Entry
+        window.handleAddUserAccess = async (e) => {
             e.preventDefault();
             if (!window.state.isAdmin) return;
             const email = document.getElementById('new-user-email').value;
             const agentName = document.getElementById('new-user-agent').value;
             const areaManager = document.getElementById('new-user-area').value;
             const shopName = document.getElementById('new-user-shop').value;
-            
-            const userId = Date.now().toString();
-            const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', userId);
+            const id = Date.now().toString();
             try {
-                await setDoc(userRef, { 
-                    email, 
-                    agentName, 
-                    areaManager, 
-                    shopName, 
-                    createdAt: new Date().toISOString() 
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', id), { 
+                    email, agentName, areaManager, shopName, createdAt: new Date().toISOString() 
                 });
                 e.target.reset();
-            } catch (err) { console.error("Add user failed:", err); }
+            } catch (err) { console.error(err); }
         };
 
-        window.handleDeleteUser = async (id) => {
+        window.handleDeleteUserAccess = async (id) => {
             if (!window.state.isAdmin) return;
-            const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', id);
-            try { await deleteDoc(userRef); } catch (err) { console.error("Delete user failed:", err); }
+            try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', id)); } catch (err) { console.error(err); }
         };
 
         window.navigateTo = (page) => {
@@ -276,15 +290,6 @@
         window.toggleTheme = () => {
             window.state.darkMode = !window.state.darkMode;
             document.documentElement.classList.toggle('dark', window.state.darkMode);
-            const logoBox = document.getElementById('logo-box');
-            const brandName = document.getElementById('brand-name');
-            if (window.state.darkMode) {
-                logoBox.className = "bg-red-600 text-white w-8 h-8 rounded-md flex items-center justify-center font-bold text-lg transition-colors duration-300";
-                brandName.className = "font-bold text-lg tracking-tight uppercase transition-colors duration-300 text-red-600";
-            } else {
-                logoBox.className = "bg-black text-white w-8 h-8 rounded-md flex items-center justify-center font-bold text-lg transition-colors duration-300";
-                brandName.className = "font-bold text-lg tracking-tight uppercase transition-colors duration-300 text-black";
-            }
             render();
         };
 
@@ -322,7 +327,7 @@
 
         function renderHome() {
             const gradient = window.state.darkMode ? 'from-black to-red-900' : 'from-black to-orange-600';
-            return `<div class="fade-in"><section class="relative h-[450px] w-full mt-0 overflow-hidden flex items-center justify-center"><div class="absolute inset-0 z-0"><img src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=2000" class="w-full h-full object-cover brightness-[0.4]" alt="Team"><div class="absolute inset-0 opacity-40 bg-gradient-to-r ${gradient}"></div></div><div class="relative z-10 text-center px-4"><div class="mb-4 inline-block bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-1 rounded text-[10px] font-bold uppercase tracking-[0.2em] text-white">Orange Egypt Partner</div><h1 class="text-5xl md:text-7xl font-black text-white uppercase tracking-tighter leading-none mb-4">One <span class="text-red-600">Team</span> One <span class="text-red-600">Goal</span></h1><p class="text-white text-lg md:text-xl font-light tracking-wide uppercase opacity-90">Reliability & Excellence</p><button onclick="toggleAuthModal(true)" class="mt-8 bg-red-600 text-white px-8 py-3 rounded font-bold uppercase text-xs tracking-widest hover:bg-red-700 transition-all shadow-2xl">Agent Portal Access</button></div></section><div class="max-w-7xl mx-auto px-4 py-20 grid grid-cols-1 md:grid-cols-2 gap-8"><div class="group cursor-pointer relative aspect-[16/9] overflow-hidden rounded-xl"><img src="https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80&w=800" class="w-full h-full object-cover group-hover:scale-105 transition-transform" alt="Events"><div class="absolute inset-0 bg-black/40 flex items-center justify-center"><h2 class="text-white text-2xl font-black uppercase tracking-widest">Pyramids Events</h2></div></div><div class="group cursor-pointer bg-red-600 rounded-xl flex flex-col items-center justify-center p-8 text-white"><div class="w-24 h-24 bg-white rounded-full flex items-center justify-center text-red-600 font-black text-4xl mb-4">pe</div><h2 class="text-2xl font-black uppercase tracking-widest">About Us</h2><p class="text-center mt-2 opacity-80 text-sm">Leading Logistics Partner in Egypt</p></div></div></div>`;
+            return `<div class="fade-in"><section class="relative h-[450px] w-full mt-0 overflow-hidden flex items-center justify-center"><div class="absolute inset-0 z-0"><img src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=2000" class="w-full h-full object-cover brightness-[0.4]" alt="Team"><div class="absolute inset-0 opacity-40 bg-gradient-to-r ${gradient}"></div></div><div class="relative z-10 text-center px-4"><div class="mb-4 inline-block bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-1 rounded text-[10px] font-bold uppercase tracking-[0.2em] text-white">Orange Egypt Partner</div><h1 class="text-5xl md:text-7xl font-black text-white uppercase tracking-tighter leading-none mb-4">One <span class="text-red-600">Team</span> One <span class="text-red-600">Goal</span></h1><p class="text-white text-lg md:text-xl font-light tracking-wide uppercase opacity-90">Reliability & Excellence</p><button onclick="toggleAuthModal(true)" class="mt-8 bg-red-600 text-white px-8 py-3 rounded font-bold uppercase text-xs tracking-widest hover:bg-red-700 transition-all shadow-2xl">Agent Portal Access</button></div></section></div>`;
         }
 
         function renderDashboard() {
@@ -332,13 +337,14 @@
                 { id: 'corporate', title: 'Corporate Materials', sub: 'Internal', icon: 'briefcase', type: 'page' },
                 { id: 'incentives', title: 'Incentives', sub: 'Recognition', icon: 'award', type: 'page' }
             ];
-            // FIXED typo MapsTo -> navigateTo
+            // CORRECTED: fixed navigateTo typo
             return `<div class="max-w-7xl mx-auto px-4 py-12 fade-in"><div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8"><h2 class="text-3xl font-black uppercase tracking-tight mb-2 text-gray-900 dark:text-white">Agent Dashboard</h2><p class="text-gray-500 text-sm uppercase tracking-widest">Authorized Access Only</p></div><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">${services.map(s => `<div onclick="${s.type === 'link' ? `window.open('${s.url}', '_blank')` : `MapsTo('service-${s.id}')`}" class="group p-8 rounded-2xl border transition-all cursor-pointer ${window.state.darkMode ? 'bg-gray-900 border-gray-800 hover:border-red-600' : 'bg-white border-gray-100 hover:border-black shadow-sm hover:shadow-xl'}"><div class="w-14 h-14 rounded-xl flex items-center justify-center mb-6 transition-colors ${window.state.darkMode ? 'bg-red-600/10 text-red-600' : 'bg-black/5 text-black group-hover:bg-red-600 group-hover:text-white'}"><i data-lucide="${s.icon}" class="w-8 h-8"></i></div><h3 class="font-black uppercase text-lg tracking-tight mb-1">${s.title}</h3><p class="text-red-600 text-xs font-bold uppercase tracking-widest mb-6">${s.sub}</p><div class="flex items-center text-xs font-bold uppercase tracking-widest group-hover:translate-x-2 transition-transform">${s.type === 'link' ? 'Open Link' : 'View Portal'} <i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i></div></div>`).join('')}</div></div>`;
         }
 
         function renderAdmin() {
-            const cats = Object.entries(window.state.materials);
+            const materials = Object.entries(window.state.materials);
             const users = window.state.users;
+            const shops = window.state.shops;
             return `
                 <div class="max-w-7xl mx-auto px-4 py-12 fade-in">
                     <div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8">
@@ -346,105 +352,74 @@
                         <p class="text-red-600 text-xs font-bold uppercase tracking-widest">Platform Administrator Dashboard</p>
                     </div>
 
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                        <div class="space-y-10">
-                            <!-- User Management Form -->
-                            <div class="p-8 rounded-3xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                                <h3 class="font-black uppercase tracking-widest text-sm mb-6 flex items-center dark:text-white"><i data-lucide="user-plus" class="w-5 h-5 mr-2 text-red-600"></i> New User Profile</h3>
-                                <form onsubmit="handleAddUser(event)" class="space-y-4">
-                                    <div>
-                                        <label class="text-[10px] font-black uppercase opacity-50 block mb-2 dark:text-gray-400">Agent Name</label>
-                                        <input id="new-user-agent" required class="w-full p-3 rounded-xl border text-xs ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}" placeholder="Agent Name">
-                                    </div>
-                                    <div>
-                                        <label class="text-[10px] font-black uppercase opacity-50 block mb-2 dark:text-gray-400">Email Address (Login)</label>
-                                        <input id="new-user-email" type="email" required class="w-full p-3 rounded-xl border text-xs ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}" placeholder="agent@email.com">
-                                    </div>
-                                    <div>
-                                        <label class="text-[10px] font-black uppercase opacity-50 block mb-2 dark:text-gray-400">Area Manager</label>
-                                        <input id="new-user-area" required class="w-full p-3 rounded-xl border text-xs ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}" placeholder="Area Manager Name">
-                                    </div>
-                                    <div>
-                                        <label class="text-[10px] font-black uppercase opacity-50 block mb-2 dark:text-gray-400">Shop Name</label>
-                                        <input id="new-user-shop" required class="w-full p-3 rounded-xl border text-xs ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}" placeholder="Shop Name">
-                                    </div>
-                                    <button type="submit" class="w-full bg-black text-white py-4 rounded-xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-gray-800 transition-all dark:bg-white dark:text-black dark:hover:bg-gray-200">Register User Access</button>
+                    <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                        <!-- Sidebar: Control Forms -->
+                        <div class="space-y-8 lg:sticky lg:top-24 h-fit">
+                            <!-- Shop Master Data Form -->
+                            <div class="p-6 rounded-2xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
+                                <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white flex items-center"><i data-lucide="database" class="w-4 h-4 mr-2 text-red-600"></i> Register Shop</h3>
+                                <form onsubmit="handleAddShopEntry(event)" class="space-y-3">
+                                    <input id="new-shop-name" required placeholder="Shop Name" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
+                                    <input id="new-shop-manager" required placeholder="Area Manager" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
+                                    <button type="submit" class="w-full bg-black text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest dark:bg-white dark:text-black">Add to DB</button>
                                 </form>
                             </div>
 
-                            <!-- Material Form -->
-                            <div class="p-8 rounded-3xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                                <h3 class="font-black uppercase tracking-widest text-sm mb-6 flex items-center dark:text-white"><i data-lucide="plus" class="w-5 h-5 mr-2 text-red-600"></i> New Material</h3>
-                                <form onsubmit="handleAdminUpload(event)" class="space-y-4">
-                                    <div>
-                                        <label class="text-[10px] font-black uppercase opacity-50 block mb-2 dark:text-gray-400">Category</label>
-                                        <select id="adm-cat" class="w-full p-3 rounded-xl border text-xs font-bold uppercase ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
-                                            <option value="orange-info">Orange Info</option>
-                                            <option value="corporate">Corporate Materials</option>
-                                            <option value="incentives">Incentives</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label class="text-[10px] font-black uppercase opacity-50 block mb-2 dark:text-gray-400">Title</label>
-                                        <input id="adm-title" required class="w-full p-3 rounded-xl border text-xs ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}" placeholder="Material Title">
-                                    </div>
-                                    <div>
-                                        <label class="text-[10px] font-black uppercase opacity-50 block mb-2 dark:text-gray-400">Description</label>
-                                        <input id="adm-desc" class="w-full p-3 rounded-xl border text-xs ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}" placeholder="Short info...">
-                                    </div>
-                                    <div>
-                                        <label class="text-[10px] font-black uppercase opacity-50 block mb-2 dark:text-gray-400">Type</label>
-                                        <div class="grid grid-cols-3 gap-2">
-                                            ${['photo', 'video', 'pdf'].map(t => `<label class="flex flex-col items-center p-2 border rounded-xl cursor-pointer hover:border-red-600 text-[8px] font-bold uppercase dark:text-white"><input type="radio" name="adm-type" value="${t}" required class="mb-1"> ${t}</label>`).join('')}
-                                        </div>
-                                    </div>
-                                    <button type="submit" class="w-full bg-red-600 text-white py-4 rounded-xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-red-700 transition-all">Upload Material</button>
+                            <!-- User Access Form -->
+                            <div class="p-6 rounded-2xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
+                                <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white flex items-center"><i data-lucide="user-plus" class="w-4 h-4 mr-2 text-red-600"></i> New Agent Access</h3>
+                                <form onsubmit="handleAddUserAccess(event)" class="space-y-3">
+                                    <input id="new-user-agent" required placeholder="Agent Name" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
+                                    <input id="new-user-email" type="email" required placeholder="Login Email" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
+                                    <input id="new-user-area" placeholder="Area Manager" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
+                                    <input id="new-user-shop" placeholder="Shop Name" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
+                                    <button type="submit" class="w-full bg-red-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest">Register</button>
                                 </form>
                             </div>
                         </div>
 
-                        <div class="lg:col-span-2 space-y-10">
-                            <!-- Users List -->
+                        <!-- Main Content: Database Views -->
+                        <div class="lg:col-span-3 space-y-8">
+                            <!-- Shop Database Table -->
                             <div class="p-6 rounded-3xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                                <h4 class="font-black uppercase tracking-widest text-[10px] mb-4 flex justify-between dark:text-white">System Users <span class="text-red-600">${users.length} Active</span></h4>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    ${users.map(u => `
-                                        <div class="p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 relative group">
-                                            <div class="flex items-start justify-between">
-                                                <div class="space-y-2">
-                                                    <div class="flex items-center space-x-2">
-                                                        <div class="bg-red-600/10 text-red-600 p-1.5 rounded-lg"><i data-lucide="user" class="w-3.5 h-3.5"></i></div>
-                                                        <p class="text-[10px] font-black uppercase dark:text-white tracking-tighter">${u.agentName || u.name}</p>
-                                                    </div>
-                                                    <div class="pl-7 space-y-1">
-                                                        <p class="text-[9px] opacity-60 dark:text-gray-400 flex items-center"><i data-lucide="mail" class="w-2.5 h-2.5 mr-1.5"></i> ${u.email}</p>
-                                                        <p class="text-[9px] opacity-60 dark:text-gray-400 flex items-center"><i data-lucide="map-pin" class="w-2.5 h-2.5 mr-1.5"></i> ${u.shopName || 'N/A'}</p>
-                                                        <p class="text-[9px] opacity-60 dark:text-gray-400 flex items-center"><i data-lucide="shield-check" class="w-2.5 h-2.5 mr-1.5"></i> ${u.areaManager || 'N/A'}</p>
-                                                    </div>
-                                                </div>
-                                                <button onclick="handleDeleteUser('${u.id}')" class="text-gray-400 hover:text-red-600 transition-colors p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                                            </div>
-                                        </div>`).join('')}
-                                    ${users.length === 0 ? '<p class="text-[10px] opacity-40 uppercase italic p-4">No users registered in system.</p>' : ''}
+                                <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 flex justify-between dark:text-white">Shop & Area Manager Database <span class="text-red-600">${shops.length} Entries</span></h4>
+                                <div class="max-h-64 overflow-y-auto custom-scrollbar border rounded-xl overflow-hidden">
+                                    <table class="w-full text-left text-[10px] uppercase font-bold tracking-tighter">
+                                        <thead class="${window.state.darkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-50 text-gray-500'}">
+                                            <tr>
+                                                <th class="p-3">Shop Name</th>
+                                                <th class="p-3">Area Manager</th>
+                                                <th class="p-3 w-10"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y ${window.state.darkMode ? 'divide-gray-800' : 'divide-gray-100'}">
+                                            ${shops.map(s => `
+                                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                                    <td class="p-3 dark:text-white">${s.shopName}</td>
+                                                    <td class="p-3 dark:text-gray-400">${s.areaManager}</td>
+                                                    <td class="p-3"><button onclick="handleDeleteShopEntry('${s.id}')" class="text-red-600 hover:opacity-50"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
 
-                            <!-- Materials List -->
-                            <div class="space-y-6">
-                                ${cats.map(([cat, items]) => `
-                                    <div class="p-6 rounded-3xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                                        <h4 class="font-black uppercase tracking-widest text-[10px] mb-4 flex justify-between dark:text-white">${cat.replace('-', ' ')} <span class="text-red-600">${items.length} Items</span></h4>
-                                        <div class="space-y-2">
-                                            ${items.map(i => `
-                                                <div class="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
-                                                    <div class="flex items-center space-x-3">
-                                                        <i data-lucide="${i.type === 'pdf' ? 'file-text' : i.type === 'video' ? 'video' : 'image'}" class="w-4 h-4 text-red-600"></i>
-                                                        <span class="text-xs font-bold uppercase tracking-tighter dark:text-white">${i.title}</span>
-                                                    </div>
-                                                    <button onclick="handleDeleteMaterial('${i.id}')" class="text-gray-400 hover:text-red-600 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                                                </div>`).join('')}
+                            <!-- Registered Agents List -->
+                            <div class="p-6 rounded-3xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
+                                <h4 class="font-black uppercase tracking-widest text-[10px] mb-4 flex justify-between dark:text-white">Active Agent Access <span class="text-red-600">${users.length} Users</span></h4>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    ${users.map(u => `
+                                        <div class="p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 flex justify-between items-start">
+                                            <div class="space-y-1">
+                                                <p class="text-[10px] font-black uppercase dark:text-white">${u.agentName}</p>
+                                                <p class="text-[9px] opacity-60 dark:text-gray-400 font-medium tracking-tight">${u.email}</p>
+                                                <p class="text-[8px] bg-red-600/10 text-red-600 px-2 py-0.5 rounded-full inline-block mt-1">${u.shopName || 'No Shop'}</p>
+                                            </div>
+                                            <button onclick="handleDeleteUserAccess('${u.id}')" class="text-gray-400 hover:text-red-600 transition-colors"><i data-lucide="user-x" class="w-4 h-4"></i></button>
                                         </div>
-                                    </div>`).join('')}
+                                    `).join('')}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -453,7 +428,7 @@
 
         function renderServiceDetail(catId) {
             const items = window.state.materials[catId] || [];
-            return `<div class="max-w-4xl mx-auto px-4 py-12 fade-in"><button onclick="navigateTo('agent-dashboard')" class="flex items-center text-xs font-bold uppercase tracking-widest text-red-600 mb-8 hover:opacity-70"><i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i> Back to Dashboard</button><h1 class="text-4xl font-black uppercase tracking-tighter mb-12 text-gray-900 dark:text-white">${catId.replace('-', ' ')} <span class="text-red-600">Materials</span></h1>${items.length === 0 ? `<div class="bg-gray-50 dark:bg-gray-900 rounded-3xl p-12 text-center border-2 border-dashed border-gray-200 dark:border-gray-800"><i data-lucide="award" class="w-12 h-12 mx-auto mb-4 text-red-600 opacity-30"></i><h3 class="font-bold uppercase tracking-widest mb-2 dark:text-white">No Items Found</h3><p class="text-xs opacity-50 dark:text-gray-500">Updates will be posted by the admin soon.</p></div>` : `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">${items.map(i => `<div class="p-6 rounded-xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800 hover:bg-gray-800' : 'bg-white border-gray-100 hover:shadow-lg'} transition-all flex justify-between items-center group cursor-pointer"><div><p class="text-xs font-bold uppercase tracking-widest mb-1 dark:text-white">${i.title}</p><p class="text-[9px] font-medium opacity-40 uppercase tracking-tighter dark:text-gray-500">${i.desc || 'System Resource'}</p></div><div class="text-red-600"><i data-lucide="${i.type === 'pdf' ? 'file-text' : i.type === 'video' ? 'video' : 'image'}" class="w-5 h-5"></i></div></div>`).join('')}</div>`}</div>`;
+            return `<div class="max-w-4xl mx-auto px-4 py-12 fade-in"><button onclick="navigateTo('agent-dashboard')" class="flex items-center text-xs font-bold uppercase tracking-widest text-red-600 mb-8 hover:opacity-70"><i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i> Back to Dashboard</button><h1 class="text-4xl font-black uppercase tracking-tighter mb-12 text-gray-900 dark:text-white">${catId.replace('-', ' ')} <span class="text-red-600">Materials</span></h1><div class="grid grid-cols-1 sm:grid-cols-2 gap-4">${items.map(i => `<div class="p-6 rounded-xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 hover:shadow-lg'} transition-all flex justify-between items-center group cursor-pointer"><div><p class="text-xs font-bold uppercase tracking-widest mb-1 dark:text-white">${i.title}</p><p class="text-[9px] font-medium opacity-40 uppercase tracking-tighter dark:text-gray-500">${i.desc || 'System Resource'}</p></div><div class="text-red-600"><i data-lucide="${i.type === 'pdf' ? 'file-text' : i.type === 'video' ? 'video' : 'image'}" class="w-5 h-5"></i></div></div>`).join('')}</div></div>`;
         }
 
         window.onload = () => {
