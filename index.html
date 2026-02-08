@@ -133,7 +133,7 @@
                     <input type="email" id="signup-email" placeholder="EMAIL ADDRESS" class="w-full px-4 py-2.5 text-[10px] font-bold tracking-widest uppercase border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 dark:text-white outline-none rounded-xl focus:border-red-600 transition-all" required>
                     <input type="password" id="signup-pass" placeholder="PASSWORD" class="w-full px-4 py-2.5 text-[10px] font-bold tracking-widest uppercase border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 dark:text-white outline-none rounded-xl focus:border-red-600 transition-all" required>
                     
-                    <select id="signup-area" onchange="updateSignupShops()" class="w-full px-4 py-2.5 text-[10px] font-bold tracking-widest uppercase border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 dark:text-white outline-none rounded-xl focus:border-red-600 transition-all" required>
+                    <select id="signup-area" onchange="updateSignupShops('signup-area', 'signup-shop')" class="w-full px-4 py-2.5 text-[10px] font-bold tracking-widest uppercase border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 dark:text-white outline-none rounded-xl focus:border-red-600 transition-all" required>
                         <option value="">SELECT AREA MANAGER</option>
                     </select>
 
@@ -505,14 +505,12 @@
         };
 
         window.updateSignupManagers = () => {
-            const select = document.getElementById('signup-area') || document.getElementById('adm-create-area');
-            if (!select) return;
+            const selects = ['signup-area', 'adm-create-area'];
             const source = window.state.shops.length > 0 
                 ? window.state.shops.map(s => s.areaManager)
                 : INITIAL_SHOP_DATA.map(s => s.manager);
             const managers = [...new Set(source)].sort();
             
-            const selects = ['signup-area', 'adm-create-area'];
             selects.forEach(id => {
                 const el = document.getElementById(id);
                 if (!el) return;
@@ -526,12 +524,8 @@
             });
         };
 
-        window.updateSignupShops = () => {
-            const isSignup = document.activeElement.id === 'signup-area';
-            const managerId = isSignup ? 'signup-area' : 'adm-create-area';
-            const shopId = isSignup ? 'signup-shop' : 'adm-create-shop';
-            
-            const manager = document.getElementById(managerId).value;
+        window.updateSignupShops = (areaId, shopId) => {
+            const manager = document.getElementById(areaId).value;
             const shopSelect = document.getElementById(shopId);
             if (!shopSelect) return;
             
@@ -577,7 +571,6 @@
         async function notifyAdminOfSignup(requestData) {
             const adminEmail = "ahmedsharaf.pe@gmail.com";
             try {
-                // Public notification collection so admin can see it in Management Hub
                 const notifId = Date.now().toString();
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notifications', notifId), {
                     to: adminEmail,
@@ -606,14 +599,13 @@
             btn.innerHTML = 'Establishing Session...';
             
             try {
-                // RULE 3 - Ensure Auth before write
                 if (!auth.currentUser) {
                     await signInAnonymously(auth);
                 }
                 
-                btn.innerHTML = 'Submitting Data...';
                 const requestId = Date.now().toString();
                 const reqObj = {
+                    id: requestId,
                     agentName: name, 
                     email: email, 
                     password: pass, 
@@ -623,13 +615,10 @@
                     createdAt: new Date().toISOString()
                 };
 
-                // Path as per RULE 1
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', requestId), reqObj);
-                
-                // Trigger Simulated Email Notification
                 await notifyAdminOfSignup(reqObj);
 
-                alert("Application submitted! Wait for Admin approval. Notification sent to ahmedsharaf.pe@gmail.com");
+                alert("Application submitted! Wait for Admin approval.");
                 toggleAuthView('login');
                 e.target.reset();
             } catch (err) {
@@ -708,6 +697,7 @@
                     approvedAt: new Date().toISOString()
                 });
                 await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', request.id));
+                alert("User approved and added to database.");
             } catch (err) { alert("Approval failed."); }
         };
 
@@ -773,7 +763,7 @@
         };
 
         window.handleDeleteUserAccess = async (id) => {
-            if (confirm("Remove access?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', id));
+            if (confirm("Remove access permanently?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', id));
         };
 
         window.handleDeleteMaterial = async (id) => {
@@ -953,6 +943,16 @@
             const requests = window.state.requests;
             const allMaterials = Object.values(window.state.materials).flat();
 
+            // Calculate Analytics
+            const managerStats = users.reduce((acc, u) => {
+                acc[u.areaManager] = (acc[u.areaManager] || 0) + 1;
+                return acc;
+            }, {});
+            const shopStats = users.reduce((acc, u) => {
+                acc[u.shopName] = (acc[u.shopName] || 0) + 1;
+                return acc;
+            }, {});
+
             return `<div class="max-w-7xl mx-auto px-4 py-12 fade-in">
                 <div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8 flex justify-between items-end">
                     <div>
@@ -998,7 +998,7 @@
                                 <input id="adm-create-name" required placeholder="Full Name" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
                                 <input id="adm-create-email" required type="email" placeholder="Email Address" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
                                 <input id="adm-create-pass" required type="text" placeholder="Set Password" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
-                                <select id="adm-create-area" onchange="updateSignupShops()" class="w-full p-2.5 rounded-xl border text-[10px] font-bold uppercase dark:bg-gray-800 dark:border-gray-700 dark:text-white">
+                                <select id="adm-create-area" onchange="updateSignupShops('adm-create-area', 'adm-create-shop')" class="w-full p-2.5 rounded-xl border text-[10px] font-bold uppercase dark:bg-gray-800 dark:border-gray-700 dark:text-white">
                                     <option value="">SELECT AREA</option>
                                 </select>
                                 <select id="adm-create-shop" class="w-full p-2.5 rounded-xl border text-[10px] font-bold uppercase dark:bg-gray-800 dark:border-gray-700 dark:text-white" disabled>
@@ -1010,6 +1010,35 @@
                     </div>
 
                     <div class="lg:col-span-3 space-y-8">
+                        <!-- Dashboard Analytics -->
+                        <div class="p-6 rounded-3xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
+                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 dark:text-white flex items-center"><i data-lucide="bar-chart-2" class="w-4 h-4 mr-2 text-red-600"></i> Distribution Stats</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div>
+                                    <p class="text-[9px] font-black uppercase tracking-widest mb-3 opacity-40">By Area Manager</p>
+                                    <div class="space-y-2">
+                                        ${Object.entries(managerStats).sort((a,b) => b[1]-a[1]).map(([m, c]) => `
+                                            <div class="flex justify-between items-center text-[10px] p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                                <span class="font-bold uppercase">${m}</span>
+                                                <span class="bg-black text-white px-2 py-0.5 rounded-md font-black">${c}</span>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                                <div>
+                                    <p class="text-[9px] font-black uppercase tracking-widest mb-3 opacity-40">By Shop Location</p>
+                                    <div class="space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar">
+                                        ${Object.entries(shopStats).sort((a,b) => b[1]-a[1]).map(([s, c]) => `
+                                            <div class="flex justify-between items-center text-[10px] p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                                <span class="font-bold uppercase">${s}</span>
+                                                <span class="bg-red-600 text-white px-2 py-0.5 rounded-md font-black">${c}</span>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         ${requests.length > 0 ? `
                         <div class="p-6 rounded-3xl border-2 border-red-600 ${window.state.darkMode ? 'bg-red-950/10' : 'bg-red-50'}">
                             <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 flex justify-between text-red-600">Pending Applications <span class="bg-red-600 text-white px-2 rounded-full">${requests.length}</span></h4>
@@ -1047,16 +1076,19 @@
                         </div>
 
                         <div class="p-6 rounded-3xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white">Active Agent Directory <span class="text-red-600">${users.length} Authorized</span></h4>
+                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white">Active Agent Directory <span class="text-red-600 font-black ml-2">${users.length} Authorized</span></h4>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 ${users.map(u => `
-                                    <div class="p-4 rounded-xl bg-gray-50 dark:bg-gray-800 flex justify-between items-center">
+                                    <div class="p-4 rounded-xl bg-gray-50 dark:bg-gray-800 flex justify-between items-center group">
                                         <div>
                                             <p class="text-[10px] font-black uppercase dark:text-white">${u.agentName}</p>
                                             <p class="text-[9px] opacity-40 dark:text-gray-400">${u.email} | ${u.shopName}</p>
                                         </div>
-                                        <button onclick="handleDeleteUserAccess('${u.id}')" class="text-gray-400 hover:text-red-600"><i data-lucide="user-x" class="w-4 h-4"></i></button>
+                                        <button onclick="handleDeleteUserAccess('${u.id}')" class="text-gray-400 hover:text-red-600 transition-colors">
+                                            <i data-lucide="user-x" class="w-4 h-4"></i>
+                                        </button>
                                     </div>`).join('')}
+                                ${users.length === 0 ? '<div class="col-span-2 py-8 text-center opacity-30 text-[10px] font-black uppercase">No authorized agents found</div>' : ''}
                             </div>
                         </div>
                     </div>
