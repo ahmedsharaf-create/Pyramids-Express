@@ -20,15 +20,22 @@
         .iframe-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
         
         /* Viewer styles */
-        .media-viewer-content { max-height: 80vh; max-width: 90vw; overflow: auto; }
-        .pdf-embed { width: 100%; height: 70vh; border-radius: 0.5rem; }
+        .media-viewer-content { max-height: 85vh; max-width: 95vw; overflow: auto; display: flex; justify-content: center; align-items: flex-start; }
+        .pdf-embed { width: 100%; height: 75vh; border-radius: 0.5rem; }
         
-        /* Original size for Incentives */
-        .original-size { 
-            max-width: none !important; 
-            max-height: none !important; 
-            object-fit: none !important;
+        /* A4 Viewing Format for Photos */
+        .a4-photo-view { 
+            width: 100%;
+            max-width: 600px; /* Approximately A4 width on high DPI screens */
+            height: auto;
+            aspect-ratio: 210 / 297; /* A4 Ratio */
+            object-fit: contain;
+            background: white;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            margin: 2rem auto;
+            border: 1px solid #ddd;
         }
+        .dark .a4-photo-view { border-color: #333; }
     </style>
 </head>
 <body class="bg-white text-gray-900 overflow-x-hidden transition-colors duration-300">
@@ -67,7 +74,7 @@
                 <span class="text-[10px] font-bold uppercase tracking-widest">Close Preview</span>
                 <i data-lucide="x" class="w-6 h-6"></i>
             </button>
-            <div id="viewer-body" class="media-viewer-content w-full bg-white dark:bg-gray-900 rounded-3xl overflow-hidden shadow-2xl flex items-center justify-center custom-scrollbar">
+            <div id="viewer-body" class="media-viewer-content w-full bg-white dark:bg-gray-900 rounded-3xl overflow-hidden shadow-2xl custom-scrollbar">
                 <!-- Content injected here -->
             </div>
             <div id="viewer-title" class="mt-4 text-white font-black uppercase tracking-widest text-sm text-center"></div>
@@ -75,7 +82,7 @@
     </div>
 
     <!-- --- Footer --- -->
-    <footer id="main-footer" class="py-12 mt-20 border-t border-gray-100 bg-gray-50 transition-colors duration-300">
+    <footer id="main-footer" class="py-12 mt-20 border-t border-gray-100 bg-gray-50 transition-colors duration-300 dark:bg-gray-950 dark:border-gray-800">
         <div class="max-w-7xl mx-auto px-4 text-center">
             <div class="flex justify-center space-x-6 mb-8 text-gray-400">
                 <i data-lucide="linkedin" class="w-5 h-5 cursor-pointer hover:text-red-600 transition-colors"></i>
@@ -86,7 +93,7 @@
         </div>
     </footer>
 
-    <!-- --- Auth Modal (Login & Sign Up) --- -->
+    <!-- --- Auth Modal --- -->
     <div id="auth-modal" class="fixed inset-0 z-[100] hidden items-center justify-center px-4">
         <div class="absolute inset-0 bg-black/90 backdrop-blur-sm" onclick="toggleAuthModal(false)"></div>
         <div class="relative w-full max-sm:max-w-xs max-w-sm p-8 rounded-3xl shadow-2xl bg-white dark:bg-gray-900 transition-colors">
@@ -497,7 +504,6 @@
                 : INITIAL_SHOP_DATA.map(s => s.manager);
             const managers = [...new Set(source)].sort();
             
-            // Handle both selects if present
             const selects = ['signup-area', 'adm-create-area'];
             selects.forEach(id => {
                 const el = document.getElementById(id);
@@ -560,14 +566,8 @@
             }
         };
 
-        // Simulated Email Notification
         async function notifyAdminOfSignup(requestData) {
             const adminEmail = "ahmedsharaf.pe@gmail.com";
-            console.log(`[SIMULATED EMAIL SENT TO ${adminEmail}]`);
-            console.log(`Subject: New Agent Application - ${requestData.agentName}`);
-            console.log(`Content: Name: ${requestData.agentName}, Email: ${requestData.email}, Shop: ${requestData.shopName}, Area: ${requestData.areaManager}`);
-            
-            // Optionally log to a 'notifications' collection for admin to view
             try {
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notifications', Date.now().toString()), {
                     to: adminEmail,
@@ -596,10 +596,7 @@
                     status: 'pending', createdAt: new Date().toISOString()
                 };
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', requestId), reqObj);
-                
-                // Trigger simulated email notification
                 await notifyAdminOfSignup(reqObj);
-                
                 alert("Application submitted! Wait for Admin approval. A notification has been sent to ahmedsharaf.pe@gmail.com");
                 toggleAuthView('login');
                 e.target.reset();
@@ -616,7 +613,6 @@
             try { await signOut(auth); navigateTo('home'); } catch (e) {}
         };
 
-        // --- Admin Specific Operations ---
         window.handleAdminCreateUser = async (e) => {
             e.preventDefault();
             const btn = e.target.querySelector('button');
@@ -633,7 +629,7 @@
                 const userId = Date.now().toString();
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userId), {
                     email,
-                    password: pass, // Record for reference
+                    password: pass,
                     agentName: name,
                     areaManager: area,
                     shopName: shop,
@@ -693,19 +689,17 @@
             const type = document.querySelector('input[name="adm-type"]:checked').value;
             
             if (!window.selectedFileData) {
-                alert("Error: No file selected. Please choose a file first.");
+                alert("Error: No file selected.");
                 return;
             }
 
             const btn = e.target.querySelector('button[type="submit"]');
-            const originalText = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = "Processing Upload...";
+            btn.innerHTML = "Publishing...";
 
             try {
                 const id = Date.now().toString();
                 const materialRef = doc(db, 'artifacts', appId, 'public', 'data', 'materials', id);
-                
                 await setDoc(materialRef, { 
                     category: cat, 
                     title: title, 
@@ -713,20 +707,14 @@
                     url: window.selectedFileData, 
                     createdAt: new Date().toISOString() 
                 });
-                
                 e.target.reset();
                 window.selectedFileData = null;
                 alert("Resource posted successfully!");
             } catch (err) { 
-                console.error("Upload Error:", err);
-                if (err.message.includes("quota") || err.message.includes("large")) {
-                    alert("Upload failed: The file is too large. Firestore documents have a 1MB limit.");
-                } else {
-                    alert("Upload failed: " + err.message);
-                }
+                alert("Upload failed: " + err.message);
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = originalText;
+                btn.innerHTML = "Publish Material";
             }
         };
 
@@ -736,7 +724,7 @@
             if (!file) return;
 
             if (file.size > 750 * 1024) {
-                alert("File is too large! Due to Base64 encoding, please use files under 750KB to stay within the 1MB Firestore limit.");
+                alert("File is too large! Due to Base64 encoding, please use files under 750KB.");
                 input.value = '';
                 statusText.textContent = "Select File (< 750KB)";
                 return;
@@ -747,10 +735,6 @@
             reader.onload = (e) => {
                 window.selectedFileData = e.target.result;
                 statusText.textContent = "File Ready: " + file.name;
-            };
-            reader.onerror = () => {
-                alert("Error reading file.");
-                statusText.textContent = "Select File (< 750KB)";
             };
             reader.readAsDataURL(file);
         };
@@ -763,23 +747,21 @@
             if (confirm("Delete this resource permanently?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'materials', id));
         };
 
-        // Viewer logic
         window.openViewer = (material) => {
             const viewer = document.getElementById('media-viewer');
             const body = document.getElementById('viewer-body');
             const title = document.getElementById('viewer-title');
             
             title.textContent = material.title;
-            body.innerHTML = '<div class="p-10 text-xs font-bold animate-pulse">Loading content...</div>';
+            body.innerHTML = '<div class="p-10 text-xs font-bold animate-pulse text-gray-400">Loading...</div>';
 
             setTimeout(() => {
                 body.innerHTML = '';
                 if (material.type === 'photo') {
-                    // Check if category is 'incentives' to apply original size
-                    const isOriginal = material.category === 'incentives' ? 'original-size' : 'max-w-full max-h-full object-contain';
-                    body.innerHTML = `<img src="${material.url}" class="${isOriginal}">`;
+                    // All photos now view as A4 portrait
+                    body.innerHTML = `<img src="${material.url}" class="a4-photo-view">`;
                 } else if (material.type === 'video') {
-                    body.innerHTML = `<video src="${material.url}" controls class="max-w-full max-h-full" autoplay></video>`;
+                    body.innerHTML = `<video src="${material.url}" controls class="max-w-full max-h-[70vh] m-8" autoplay></video>`;
                 } else if (material.type === 'pdf') {
                     body.innerHTML = `<iframe src="${material.url}" class="pdf-embed"></iframe>`;
                 }
@@ -811,7 +793,7 @@
                 } else {
                     navHtml += `<button onclick="navigateTo('agent-dashboard')" class="text-xs uppercase font-bold tracking-widest hover:text-red-600 transition-colors">Dashboard</button>`;
                 }
-                navHtml += `<div class="flex items-center space-x-4 border-l border-gray-200 dark:border-gray-800 pl-6"><span class="text-xs font-bold opacity-60">${s.user.name}</span><button onclick="logout()" class="text-red-600 hover:opacity-70 transition-opacity"><i data-lucide="log-out" class="w-4 h-4"></i></button></div>`;
+                navHtml += `<div class="flex items-center space-x-4 border-l border-gray-200 dark:border-gray-800 pl-6"><span class="text-xs font-bold opacity-60 dark:text-gray-400">${s.user.name}</span><button onclick="logout()" class="text-red-600 hover:opacity-70 transition-opacity"><i data-lucide="log-out" class="w-4 h-4"></i></button></div>`;
             } else {
                 navHtml += `<button onclick="toggleAuthModal(true)" class="px-4 py-1.5 rounded text-xs font-bold uppercase tracking-widest ${s.darkMode ? 'bg-red-600 text-white' : 'bg-black text-white'} transition-colors">Agent Login</button>`;
             }
@@ -844,7 +826,6 @@
                         <h2 class="text-3xl font-black uppercase tracking-tight mb-2 text-gray-900 dark:text-white">Agent Dashboard</h2>
                         <p class="text-gray-500 text-sm uppercase tracking-widest">Authorized Access Only</p>
                     </div>
-                    ${window.state.isAdmin ? `<button onclick="navigateTo('admin-panel')" class="text-[10px] font-black uppercase tracking-[0.2em] text-red-600 border border-red-600 px-4 py-2 rounded-xl hover:bg-red-600 hover:text-white transition-all">Go to Management</button>` : ''}
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     ${services.map(s => `
@@ -852,9 +833,9 @@
                             <div class="w-14 h-14 rounded-xl flex items-center justify-center mb-6 transition-colors ${window.state.darkMode ? 'bg-red-600/10 text-red-600' : 'bg-black/5 text-black group-hover:bg-red-600 group-hover:text-white'}">
                                 <i data-lucide="${s.icon}" class="w-8 h-8"></i>
                             </div>
-                            <h3 class="font-black uppercase text-lg tracking-tight mb-1">${s.title}</h3>
+                            <h3 class="font-black uppercase text-lg tracking-tight mb-1 dark:text-white">${s.title}</h3>
                             <p class="text-red-600 text-xs font-bold uppercase tracking-widest mb-6">${s.sub}</p>
-                            <div class="flex items-center text-xs font-bold uppercase tracking-widest group-hover:translate-x-2 transition-transform">
+                            <div class="flex items-center text-xs font-bold uppercase tracking-widest group-hover:translate-x-2 transition-transform dark:text-gray-400">
                                 View Portal <i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i>
                             </div>
                         </div>`).join('')}
@@ -892,13 +873,11 @@
 
                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
                     <div class="lg:col-span-1 space-y-6">
-                         <!-- DATABASE SEED -->
                          <div class="p-6 rounded-2xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
                             <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white">Quick Actions</h3>
                             <button id="seed-db-btn" onclick="seedShopDatabase()" class="w-full bg-black text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-widest dark:bg-gray-800 mb-4">Sync Shop Database</button>
                          </div>
 
-                         <!-- UPLOAD -->
                          <div class="p-6 rounded-2xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
                             <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white text-red-600">Post Material</h3>
                             <form onsubmit="handleAdminUpload(event)" class="space-y-3">
@@ -908,7 +887,6 @@
                                     <option value="incentives">Incentives</option>
                                 </select>
                                 <input id="adm-title" required placeholder="Resource Title" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
-                                
                                 <div class="relative w-full">
                                     <input type="file" id="adm-file" onchange="handleFileSelect(this)" class="hidden" accept="image/*,video/*,application/pdf">
                                     <label for="adm-file" class="w-full flex items-center justify-center p-4 border-2 border-dashed rounded-xl cursor-pointer hover:border-red-600 transition-colors ${window.state.darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'}">
@@ -927,14 +905,12 @@
                             </form>
                          </div>
 
-                         <!-- CREATE AGENT ACCOUNT -->
                          <div class="p-6 rounded-2xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
                             <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white text-blue-600">Create Agent Account</h3>
                             <form onsubmit="handleAdminCreateUser(event)" class="space-y-3">
                                 <input id="adm-create-name" required placeholder="Full Name" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
                                 <input id="adm-create-email" required type="email" placeholder="Email Address" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
                                 <input id="adm-create-pass" required type="text" placeholder="Set Password" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
-                                
                                 <select id="adm-create-area" onchange="updateSignupShops()" class="w-full p-2.5 rounded-xl border text-[10px] font-bold uppercase dark:bg-gray-800 dark:border-gray-700 dark:text-white">
                                     <option value="">SELECT AREA</option>
                                 </select>
@@ -947,32 +923,27 @@
                     </div>
 
                     <div class="lg:col-span-3 space-y-8">
-                        <!-- PENDING -->
                         ${requests.length > 0 ? `
                         <div class="p-6 rounded-3xl border-2 border-red-600 ${window.state.darkMode ? 'bg-red-950/10' : 'bg-red-50'}">
-                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 flex justify-between text-red-600">Applications for ahmedsharaf.pe@gmail.com <span class="bg-red-600 text-white px-2 rounded-full">${requests.length}</span></h4>
+                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 flex justify-between text-red-600">Pending Applications <span class="bg-red-600 text-white px-2 rounded-full">${requests.length}</span></h4>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 ${requests.map(req => `
-                                    <div class="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-red-100 shadow-sm">
-                                        <div class="flex justify-between items-start">
-                                            <div>
-                                                <p class="text-xs font-black uppercase dark:text-white">${req.agentName}</p>
-                                                <p class="text-[10px] font-medium opacity-60 dark:text-gray-400 mb-2">${req.email}</p>
-                                                <div class="text-[8px] font-black uppercase tracking-widest text-red-600">${req.shopName} | ${req.areaManager}</div>
-                                            </div>
-                                            <div class="flex space-x-2">
-                                                <button onclick='handleApproveRequest(${JSON.stringify(req).replace(/'/g, "&apos;")})' class="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-600 hover:text-white transition-all"><i data-lucide="check" class="w-4 h-4"></i></button>
-                                                <button onclick="handleRejectRequest('${req.id}')" class="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all"><i data-lucide="x" class="w-4 h-4"></i></button>
-                                            </div>
+                                    <div class="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-red-100 shadow-sm flex justify-between items-center">
+                                        <div>
+                                            <p class="text-xs font-black uppercase dark:text-white">${req.agentName}</p>
+                                            <p class="text-[10px] opacity-60 dark:text-gray-400 mb-1">${req.email}</p>
+                                            <p class="text-[8px] font-black uppercase text-red-600">${req.shopName}</p>
                                         </div>
-                                    </div>
-                                `).join('')}
+                                        <div class="flex space-x-2">
+                                            <button onclick='handleApproveRequest(${JSON.stringify(req).replace(/'/g, "&apos;")})' class="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-600 hover:text-white transition-all"><i data-lucide="check" class="w-4 h-4"></i></button>
+                                            <button onclick="handleRejectRequest('${req.id}')" class="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all"><i data-lucide="x" class="w-4 h-4"></i></button>
+                                        </div>
+                                    </div>`).join('')}
                             </div>
                         </div>` : ''}
 
-                        <!-- RESOURCES -->
                         <div class="p-6 rounded-3xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 dark:text-white">Active Resources Library</h4>
+                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 dark:text-white">Resource Library</h4>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 ${allMaterials.map(m => `
                                     <div class="p-4 rounded-xl bg-gray-50 dark:bg-gray-800 flex justify-between items-center group">
@@ -981,14 +952,13 @@
                                             <p class="text-[8px] opacity-40 uppercase">${m.category}</p>
                                         </div>
                                         <div class="flex space-x-2">
-                                            <button onclick='openViewer(${JSON.stringify(m).replace(/'/g, "&apos;")})' class="text-gray-400 hover:text-black dark:hover:text-white transition-colors"><i data-lucide="eye" class="w-4 h-4"></i></button>
-                                            <button onclick="handleDeleteMaterial('${m.id}')" class="text-gray-400 hover:text-red-600 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                            <button onclick='openViewer(${JSON.stringify(m).replace(/'/g, "&apos;")})' class="text-gray-400 hover:text-black dark:hover:text-white"><i data-lucide="eye" class="w-4 h-4"></i></button>
+                                            <button onclick="handleDeleteMaterial('${m.id}')" class="text-gray-400 hover:text-red-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                                         </div>
                                     </div>`).join('')}
                             </div>
                         </div>
 
-                        <!-- AUTHORIZED AGENTS -->
                         <div class="p-6 rounded-3xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
                             <h4 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white">Active Agent Directory <span class="text-red-600">${users.length} Authorized</span></h4>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1025,7 +995,7 @@
                                 <i data-lucide="${i.type === 'pdf' ? 'file-text' : i.type === 'video' ? 'video' : 'image'}" class="w-5 h-5"></i>
                             </div>
                         </div>`).join('')}
-                    ${items.length === 0 ? '<div class="col-span-2 py-20 text-center opacity-30 uppercase font-black text-xs tracking-widest">No materials uploaded yet.</div>' : ''}
+                    ${items.length === 0 ? '<div class="col-span-2 py-20 text-center opacity-30 uppercase font-black text-xs tracking-widest">No materials published yet.</div>' : ''}
                 </div>
             </div>`;
         }
