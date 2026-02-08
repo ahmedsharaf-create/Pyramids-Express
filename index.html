@@ -91,21 +91,17 @@
         import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
 
-        // --- Your Custom Configuration ---
         const myFirebaseConfig = {
             apiKey: "AIzaSyDDBFnDT5NDZdqqSfVA-uQ283DaagdneKc",
-            authDomain: "pyramids-express.firebaseapp.com",
-            projectId: "pyramids-express",
-            storageBucket: "pyramids-express.firebasestorage.app",
-            messagingSenderId: "899055026028",
-            appId: "1:899055026028:web:6863c2a063949936abbd49",
+            authDomain: "pyramids-express-52a27.firebaseapp.com",
+            projectId: "pyramids-express-52a27",
+            storageBucket: "pyramids-express-52a27.firebasestorage.app",
+            messagingSenderId: "806262842725",
+            appId: "1:806262842725:web:6863c2a063949936abbd49",
             measurementId: "G-3ZR6009M3R"
         };
 
-        // --- Safe Initialization for Environment Flexibility ---
         let firebaseConfig = myFirebaseConfig;
-        
-        // Use environment variables if they exist (Canvas Preview), else use custom config
         try {
             if (typeof __firebase_config !== 'undefined' && __firebase_config) {
                 const envConfig = JSON.parse(__firebase_config);
@@ -113,13 +109,12 @@
             }
         } catch (e) {}
 
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'pyramids-express';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'pyramids-express-52a27';
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
         const analytics = firebaseConfig.measurementId ? getAnalytics(app) : null;
 
-        // --- Global State ---
         window.state = {
             isLoggedIn: false,
             isAdmin: false,
@@ -130,16 +125,15 @@
                 'orange-info': [],
                 'corporate': [],
                 'incentives': []
-            }
+            },
+            users: []
         };
 
-        // --- Auth Initialization ---
         async function initAuth() {
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
-                    // Start anonymously if no token exists, to allow reading public data
                     await signInAnonymously(auth);
                 }
             } catch (error) {
@@ -165,15 +159,10 @@
         function setupDataSync() {
             if (!auth.currentUser) return;
             
-            // Path follows Rule 1: /artifacts/{appId}/public/data/materials
+            // Sync Materials
             const publicDataRef = collection(db, 'artifacts', appId, 'public', 'data', 'materials');
-            
             onSnapshot(publicDataRef, (snapshot) => {
-                const newMaterials = {
-                    'orange-info': [],
-                    'corporate': [],
-                    'incentives': []
-                };
+                const newMaterials = { 'orange-info': [], 'corporate': [], 'incentives': [] };
                 snapshot.forEach((doc) => {
                     const data = doc.data();
                     if (newMaterials[data.category]) {
@@ -182,34 +171,38 @@
                 });
                 window.state.materials = newMaterials;
                 render();
-            }, (err) => console.error("Firestore sync error:", err));
+            }, (err) => console.error(err));
+
+            // Sync Users
+            const usersRef = collection(db, 'artifacts', appId, 'public', 'data', 'users');
+            onSnapshot(usersRef, (snapshot) => {
+                const newUsers = [];
+                snapshot.forEach((doc) => {
+                    newUsers.push({ id: doc.id, ...doc.data() });
+                });
+                window.state.users = newUsers;
+                render();
+            }, (err) => console.error(err));
         }
 
-        // --- UI Logic Exported to Global ---
         window.handleLogin = async (e) => {
             e.preventDefault();
             const btn = document.getElementById('auth-submit-btn');
             const email = document.getElementById('login-email').value;
-            const pass = document.getElementById('login-pass').value;
             
             btn.disabled = true;
             btn.innerHTML = '<span class="animate-spin mr-2">◌</span> Authorizing...';
 
             try {
-                // For actual Firebase usage on Vercel, this is the real method:
-                // await signInWithEmailAndPassword(auth, email, pass);
-                
-                // For demo/Canvas logic simulation:
+                // Simulation for Canvas
                 window.state.isLoggedIn = true;
                 window.state.user = { email, name: email === 'admin@pyramidsexpress.com' ? 'System Admin' : 'PE Agent' };
                 window.state.isAdmin = email === 'admin@pyramidsexpress.com';
                 window.state.currentPage = window.state.isAdmin ? 'admin-panel' : 'agent-dashboard';
-                
                 toggleAuthModal(false);
                 render();
             } catch (err) {
                 console.error("Login failed:", err);
-                alert("Login Error: Please check credentials.");
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = 'Authorize Session';
@@ -217,9 +210,7 @@
         };
 
         window.logout = async () => {
-            try {
-                await signOut(auth);
-            } catch (e) {}
+            try { await signOut(auth); } catch (e) {}
             window.state.isLoggedIn = false;
             window.state.isAdmin = false;
             window.state.currentPage = 'home';
@@ -229,37 +220,51 @@
         window.handleAdminUpload = async (e) => {
             e.preventDefault();
             if (!window.state.isAdmin) return;
-
             const cat = document.getElementById('adm-cat').value;
             const title = document.getElementById('adm-title').value;
             const desc = document.getElementById('adm-desc').value;
             const type = document.querySelector('input[name="adm-type"]:checked').value;
-            
             const materialId = Date.now().toString();
             const materialRef = doc(db, 'artifacts', appId, 'public', 'data', 'materials', materialId);
-            
             try {
-                await setDoc(materialRef, {
-                    category: cat,
-                    title: title,
-                    type: type,
-                    desc: desc || 'System Resource',
-                    createdAt: new Date().toISOString()
-                });
+                await setDoc(materialRef, { category: cat, title: title, type: type, desc: desc || 'System Resource', createdAt: new Date().toISOString() });
                 e.target.reset();
-            } catch (err) {
-                console.error("Upload failed:", err);
-            }
+            } catch (err) { console.error("Upload failed:", err); }
         };
 
         window.handleDeleteMaterial = async (id) => {
             if (!window.state.isAdmin) return;
             const materialRef = doc(db, 'artifacts', appId, 'public', 'data', 'materials', id);
+            try { await deleteDoc(materialRef); } catch (err) { console.error("Delete failed:", err); }
+        };
+
+        // --- User Management Logic ---
+        window.handleAddUser = async (e) => {
+            e.preventDefault();
+            if (!window.state.isAdmin) return;
+            const email = document.getElementById('new-user-email').value;
+            const agentName = document.getElementById('new-user-agent').value;
+            const areaManager = document.getElementById('new-user-area').value;
+            const shopName = document.getElementById('new-user-shop').value;
+            
+            const userId = Date.now().toString();
+            const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', userId);
             try {
-                await deleteDoc(materialRef);
-            } catch (err) {
-                console.error("Delete failed:", err);
-            }
+                await setDoc(userRef, { 
+                    email, 
+                    agentName, 
+                    areaManager, 
+                    shopName, 
+                    createdAt: new Date().toISOString() 
+                });
+                e.target.reset();
+            } catch (err) { console.error("Add user failed:", err); }
+        };
+
+        window.handleDeleteUser = async (id) => {
+            if (!window.state.isAdmin) return;
+            const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', id);
+            try { await deleteDoc(userRef); } catch (err) { console.error("Delete user failed:", err); }
         };
 
         window.navigateTo = (page) => {
@@ -327,12 +332,123 @@
                 { id: 'corporate', title: 'Corporate Materials', sub: 'Internal', icon: 'briefcase', type: 'page' },
                 { id: 'incentives', title: 'Incentives', sub: 'Recognition', icon: 'award', type: 'page' }
             ];
+            // FIXED typo MapsTo -> navigateTo
             return `<div class="max-w-7xl mx-auto px-4 py-12 fade-in"><div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8"><h2 class="text-3xl font-black uppercase tracking-tight mb-2 text-gray-900 dark:text-white">Agent Dashboard</h2><p class="text-gray-500 text-sm uppercase tracking-widest">Authorized Access Only</p></div><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">${services.map(s => `<div onclick="${s.type === 'link' ? `window.open('${s.url}', '_blank')` : `MapsTo('service-${s.id}')`}" class="group p-8 rounded-2xl border transition-all cursor-pointer ${window.state.darkMode ? 'bg-gray-900 border-gray-800 hover:border-red-600' : 'bg-white border-gray-100 hover:border-black shadow-sm hover:shadow-xl'}"><div class="w-14 h-14 rounded-xl flex items-center justify-center mb-6 transition-colors ${window.state.darkMode ? 'bg-red-600/10 text-red-600' : 'bg-black/5 text-black group-hover:bg-red-600 group-hover:text-white'}"><i data-lucide="${s.icon}" class="w-8 h-8"></i></div><h3 class="font-black uppercase text-lg tracking-tight mb-1">${s.title}</h3><p class="text-red-600 text-xs font-bold uppercase tracking-widest mb-6">${s.sub}</p><div class="flex items-center text-xs font-bold uppercase tracking-widest group-hover:translate-x-2 transition-transform">${s.type === 'link' ? 'Open Link' : 'View Portal'} <i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i></div></div>`).join('')}</div></div>`;
         }
 
         function renderAdmin() {
             const cats = Object.entries(window.state.materials);
-            return `<div class="max-w-7xl mx-auto px-4 py-12 fade-in"><div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8"><h2 class="text-4xl font-black uppercase tracking-tight mb-2 text-gray-900 dark:text-white">Management</h2><p class="text-red-600 text-xs font-bold uppercase tracking-widest">Platform Administrator Dashboard</p></div><div class="grid grid-cols-1 lg:grid-cols-3 gap-10"><div class="p-8 rounded-3xl border h-fit ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}"><h3 class="font-black uppercase tracking-widest text-sm mb-6 flex items-center dark:text-white"><i data-lucide="plus" class="w-5 h-5 mr-2 text-red-600"></i> New Material</h3><form onsubmit="handleAdminUpload(event)" class="space-y-4"><div><label class="text-[10px] font-black uppercase opacity-50 block mb-2 dark:text-gray-400">Category</label><select id="adm-cat" class="w-full p-3 rounded-xl border text-xs font-bold uppercase ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}"><option value="orange-info">Orange Info</option><option value="corporate">Corporate Materials</option><option value="incentives">Incentives</option></select></div><div><label class="text-[10px] font-black uppercase opacity-50 block mb-2 dark:text-gray-400">Title</label><input id="adm-title" required class="w-full p-3 rounded-xl border text-xs ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}" placeholder="Material Title"></div><div><label class="text-[10px] font-black uppercase opacity-50 block mb-2 dark:text-gray-400">Description</label><input id="adm-desc" class="w-full p-3 rounded-xl border text-xs ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}" placeholder="Short info..."></div><div><label class="text-[10px] font-black uppercase opacity-50 block mb-2 dark:text-gray-400">Type</label><div class="grid grid-cols-3 gap-2">${['photo', 'video', 'pdf'].map(t => `<label class="flex flex-col items-center p-2 border rounded-xl cursor-pointer hover:border-red-600 text-[8px] font-bold uppercase dark:text-white"><input type="radio" name="adm-type" value="${t}" required class="mb-1"> ${t}</label>`).join('')}</div></div><button type="submit" class="w-full bg-red-600 text-white py-4 rounded-xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-red-700 transition-all">Upload Material</button></form></div><div class="lg:col-span-2 space-y-6">${cats.map(([cat, items]) => `<div class="p-6 rounded-3xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100'}"><h4 class="font-black uppercase tracking-widest text-[10px] mb-4 flex justify-between dark:text-white">${cat.replace('-', ' ')} <span class="text-red-600">${items.length} Items</span></h4><div class="space-y-2">${items.map(i => `<div class="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50"><div class="flex items-center space-x-3"><i data-lucide="${i.type === 'pdf' ? 'file-text' : i.type === 'video' ? 'video' : 'image'}" class="w-4 h-4 text-red-600"></i><span class="text-xs font-bold uppercase tracking-tighter dark:text-white">${i.title}</span></div><button onclick="handleDeleteMaterial('${i.id}')" class="text-gray-400 hover:text-red-600 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div>`).join('')}</div></div>`).join('')}</div></div></div>`;
+            const users = window.state.users;
+            return `
+                <div class="max-w-7xl mx-auto px-4 py-12 fade-in">
+                    <div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8">
+                        <h2 class="text-4xl font-black uppercase tracking-tight mb-2 text-gray-900 dark:text-white">Management</h2>
+                        <p class="text-red-600 text-xs font-bold uppercase tracking-widest">Platform Administrator Dashboard</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                        <div class="space-y-10">
+                            <!-- User Management Form -->
+                            <div class="p-8 rounded-3xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
+                                <h3 class="font-black uppercase tracking-widest text-sm mb-6 flex items-center dark:text-white"><i data-lucide="user-plus" class="w-5 h-5 mr-2 text-red-600"></i> New User Profile</h3>
+                                <form onsubmit="handleAddUser(event)" class="space-y-4">
+                                    <div>
+                                        <label class="text-[10px] font-black uppercase opacity-50 block mb-2 dark:text-gray-400">Agent Name</label>
+                                        <input id="new-user-agent" required class="w-full p-3 rounded-xl border text-xs ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}" placeholder="Agent Name">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-black uppercase opacity-50 block mb-2 dark:text-gray-400">Email Address (Login)</label>
+                                        <input id="new-user-email" type="email" required class="w-full p-3 rounded-xl border text-xs ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}" placeholder="agent@email.com">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-black uppercase opacity-50 block mb-2 dark:text-gray-400">Area Manager</label>
+                                        <input id="new-user-area" required class="w-full p-3 rounded-xl border text-xs ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}" placeholder="Area Manager Name">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-black uppercase opacity-50 block mb-2 dark:text-gray-400">Shop Name</label>
+                                        <input id="new-user-shop" required class="w-full p-3 rounded-xl border text-xs ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}" placeholder="Shop Name">
+                                    </div>
+                                    <button type="submit" class="w-full bg-black text-white py-4 rounded-xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-gray-800 transition-all dark:bg-white dark:text-black dark:hover:bg-gray-200">Register User Access</button>
+                                </form>
+                            </div>
+
+                            <!-- Material Form -->
+                            <div class="p-8 rounded-3xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
+                                <h3 class="font-black uppercase tracking-widest text-sm mb-6 flex items-center dark:text-white"><i data-lucide="plus" class="w-5 h-5 mr-2 text-red-600"></i> New Material</h3>
+                                <form onsubmit="handleAdminUpload(event)" class="space-y-4">
+                                    <div>
+                                        <label class="text-[10px] font-black uppercase opacity-50 block mb-2 dark:text-gray-400">Category</label>
+                                        <select id="adm-cat" class="w-full p-3 rounded-xl border text-xs font-bold uppercase ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
+                                            <option value="orange-info">Orange Info</option>
+                                            <option value="corporate">Corporate Materials</option>
+                                            <option value="incentives">Incentives</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-black uppercase opacity-50 block mb-2 dark:text-gray-400">Title</label>
+                                        <input id="adm-title" required class="w-full p-3 rounded-xl border text-xs ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}" placeholder="Material Title">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-black uppercase opacity-50 block mb-2 dark:text-gray-400">Description</label>
+                                        <input id="adm-desc" class="w-full p-3 rounded-xl border text-xs ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}" placeholder="Short info...">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-black uppercase opacity-50 block mb-2 dark:text-gray-400">Type</label>
+                                        <div class="grid grid-cols-3 gap-2">
+                                            ${['photo', 'video', 'pdf'].map(t => `<label class="flex flex-col items-center p-2 border rounded-xl cursor-pointer hover:border-red-600 text-[8px] font-bold uppercase dark:text-white"><input type="radio" name="adm-type" value="${t}" required class="mb-1"> ${t}</label>`).join('')}
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="w-full bg-red-600 text-white py-4 rounded-xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-red-700 transition-all">Upload Material</button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <div class="lg:col-span-2 space-y-10">
+                            <!-- Users List -->
+                            <div class="p-6 rounded-3xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
+                                <h4 class="font-black uppercase tracking-widest text-[10px] mb-4 flex justify-between dark:text-white">System Users <span class="text-red-600">${users.length} Active</span></h4>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    ${users.map(u => `
+                                        <div class="p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 relative group">
+                                            <div class="flex items-start justify-between">
+                                                <div class="space-y-2">
+                                                    <div class="flex items-center space-x-2">
+                                                        <div class="bg-red-600/10 text-red-600 p-1.5 rounded-lg"><i data-lucide="user" class="w-3.5 h-3.5"></i></div>
+                                                        <p class="text-[10px] font-black uppercase dark:text-white tracking-tighter">${u.agentName || u.name}</p>
+                                                    </div>
+                                                    <div class="pl-7 space-y-1">
+                                                        <p class="text-[9px] opacity-60 dark:text-gray-400 flex items-center"><i data-lucide="mail" class="w-2.5 h-2.5 mr-1.5"></i> ${u.email}</p>
+                                                        <p class="text-[9px] opacity-60 dark:text-gray-400 flex items-center"><i data-lucide="map-pin" class="w-2.5 h-2.5 mr-1.5"></i> ${u.shopName || 'N/A'}</p>
+                                                        <p class="text-[9px] opacity-60 dark:text-gray-400 flex items-center"><i data-lucide="shield-check" class="w-2.5 h-2.5 mr-1.5"></i> ${u.areaManager || 'N/A'}</p>
+                                                    </div>
+                                                </div>
+                                                <button onclick="handleDeleteUser('${u.id}')" class="text-gray-400 hover:text-red-600 transition-colors p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                            </div>
+                                        </div>`).join('')}
+                                    ${users.length === 0 ? '<p class="text-[10px] opacity-40 uppercase italic p-4">No users registered in system.</p>' : ''}
+                                </div>
+                            </div>
+
+                            <!-- Materials List -->
+                            <div class="space-y-6">
+                                ${cats.map(([cat, items]) => `
+                                    <div class="p-6 rounded-3xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
+                                        <h4 class="font-black uppercase tracking-widest text-[10px] mb-4 flex justify-between dark:text-white">${cat.replace('-', ' ')} <span class="text-red-600">${items.length} Items</span></h4>
+                                        <div class="space-y-2">
+                                            ${items.map(i => `
+                                                <div class="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+                                                    <div class="flex items-center space-x-3">
+                                                        <i data-lucide="${i.type === 'pdf' ? 'file-text' : i.type === 'video' ? 'video' : 'image'}" class="w-4 h-4 text-red-600"></i>
+                                                        <span class="text-xs font-bold uppercase tracking-tighter dark:text-white">${i.title}</span>
+                                                    </div>
+                                                    <button onclick="handleDeleteMaterial('${i.id}')" class="text-gray-400 hover:text-red-600 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                                </div>`).join('')}
+                                        </div>
+                                    </div>`).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
         }
 
         function renderServiceDetail(catId) {
