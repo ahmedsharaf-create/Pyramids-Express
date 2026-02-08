@@ -26,9 +26,9 @@
         /* A4 Viewing Format for Photos */
         .a4-photo-view { 
             width: 100%;
-            max-width: 600px; /* Approximately A4 width on high DPI screens */
+            max-width: 600px;
             height: auto;
-            aspect-ratio: 210 / 297; /* A4 Ratio */
+            aspect-ratio: 210 / 297;
             object-fit: contain;
             background: white;
             box-shadow: 0 20px 50px rgba(0,0,0,0.3);
@@ -85,9 +85,15 @@
     <footer id="main-footer" class="py-12 mt-20 border-t border-gray-100 bg-gray-50 transition-colors duration-300 dark:bg-gray-950 dark:border-gray-800">
         <div class="max-w-7xl mx-auto px-4 text-center">
             <div class="flex justify-center space-x-6 mb-8 text-gray-400">
-                <i data-lucide="linkedin" class="w-5 h-5 cursor-pointer hover:text-red-600 transition-colors"></i>
-                <i data-lucide="mail" class="w-5 h-5 cursor-pointer hover:text-red-600 transition-colors"></i>
-                <i data-lucide="map-pin" class="w-5 h-5 cursor-pointer hover:text-red-600 transition-colors"></i>
+                <a href="https://www.linkedin.com/company/pyramids-express-orange" target="_blank" class="hover:text-red-600 transition-colors">
+                    <i data-lucide="linkedin" class="w-5 h-5"></i>
+                </a>
+                <a href="mailto:ahmedsharaf.pe@gmail.com" class="hover:text-red-600 transition-colors">
+                    <i data-lucide="mail" class="w-5 h-5"></i>
+                </a>
+                <a href="https://www.google.com/maps/place/Al+Baramelgi,+Gazirat+Ad+Dahab,+Al+Giza,+Giza+Governorate+3726001/@29.9895407,31.2159432" target="_blank" class="hover:text-red-600 transition-colors">
+                    <i data-lucide="map-pin" class="w-5 h-5"></i>
+                </a>
             </div>
             <p class="text-[10px] uppercase tracking-[0.3em] text-gray-400">© <span id="year"></span> Pyramids Express Quality App</p>
         </div>
@@ -156,7 +162,8 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const firebaseConfig = {
+        // Access global variables provided by environment if they were set, or use defaults
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
             apiKey: "AIzaSyD-1puhqN-3YUCx4PU2d0_Umb06g6Kacco",
             authDomain: "pyramids-express-52a27.firebaseapp.com",
             projectId: "pyramids-express-52a27",
@@ -165,7 +172,7 @@
             appId: "1:806262842725:web:97e8c0493d7b5d4a1bad8c"
         };
 
-        const appId = "pyramids-express-52a27";
+        const appId = typeof __app_id !== 'undefined' ? __app_id : "pyramids-express-52a27";
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -871,7 +878,7 @@
                             </div>
                             <div class="px-2">
                                 <p class="text-sm font-black uppercase dark:text-white leading-tight mb-1">${i.title}</p>
-                                <div class="text-[9px] font-bold uppercase tracking-widest opacity-50 dark:text-gray-400">Certified Achiever</div>
+                                <div class="text-[9px] font-bold uppercase tracking-widest opacity-50 dark:text-gray-400">Achiever Profile</div>
                             </div>
                         </div>`).join('')}
                     ${items.length === 0 ? '<div class="col-span-4 py-20 text-center opacity-30 uppercase font-black text-xs tracking-widest border-2 border-dashed rounded-3xl">No heroes announced yet.</div>' : ''}
