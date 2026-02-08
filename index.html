@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pyramids Express | Agent Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; transition: background-color 0.3s, color 0.3s; }
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); }
+        .dark .glass { background: rgba(0, 0, 0, 0.8); }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #ef4444; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-white text-gray-900 overflow-x-hidden">
+
+    <!-- --- Navigation --- -->
+    <nav id="navbar" class="fixed top-0 w-full z-50 border-b border-gray-100 bg-white/95 backdrop-blur-md transition-all duration-300">
+        <div class="max-w-7xl mx-auto px-4 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo: Changes color based on theme -->
+                <div class="flex items-center space-x-3 cursor-pointer" onclick="navigateTo('home')">
+                    <div id="logo-box" class="bg-black text-white w-8 h-8 rounded-md flex items-center justify-center font-bold text-lg transition-colors duration-300">pe</div>
+                    <span id="brand-name" class="font-bold text-lg tracking-tight uppercase transition-colors duration-300 text-black">Pyramids Express</span>
+                </div>
+
+                <div class="hidden md:flex items-center space-x-6">
+                    <button onclick="toggleTheme()" class="p-2 hover:opacity-70 transition-opacity">
+                        <i data-lucide="moon" id="theme-icon" class="w-5 h-5"></i>
+                    </button>
+                    <div id="nav-links" class="flex items-center space-x-6">
+                        <!-- Links injected by JS -->
+                    </div>
+                </div>
+
+                <div class="md:hidden flex items-center space-x-4">
+                    <button onclick="toggleTheme()"><i data-lucide="moon" class="w-6 h-6"></i></button>
+                    <button onclick="toggleMobileMenu()"><i data-lucide="menu" class="w-6 h-6"></i></button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- --- Main Content Area --- -->
+    <div id="app-root" class="min-h-screen pt-16">
+        <!-- Components rendered here -->
+    </div>
+
+    <!-- --- Footer --- -->
+    <footer id="main-footer" class="py-12 mt-20 border-t border-gray-100 bg-gray-50 transition-colors duration-300">
+        <div class="max-w-7xl mx-auto px-4 text-center">
+            <div class="flex justify-center space-x-6 mb-8 text-gray-400">
+                <i data-lucide="linkedin" class="w-5 h-5 cursor-pointer hover:text-red-600 transition-colors"></i>
+                <i data-lucide="mail" class="w-5 h-5 cursor-pointer hover:text-red-600 transition-colors"></i>
+                <i data-lucide="map-pin" class="w-5 h-5 cursor-pointer hover:text-red-600 transition-colors"></i>
+            </div>
+            <p class="text-[10px] uppercase tracking-[0.3em] text-gray-400">© <span id="year"></span> Pyramids Express Quality App</p>
+        </div>
+    </footer>
+
+    <!-- --- Login Modal --- -->
+    <div id="auth-modal" class="fixed inset-0 z-[100] hidden items-center justify-center px-4">
+        <div class="absolute inset-0 bg-black/90 backdrop-blur-sm" onclick="toggleAuthModal(false)"></div>
+        <div class="relative w-full max-w-sm p-8 rounded-3xl shadow-2xl bg-white dark:bg-gray-900 transition-colors">
+            <div class="text-center mb-8">
+                <div class="bg-red-600 text-white w-12 h-12 rounded-xl flex items-center justify-center font-bold text-2xl mx-auto mb-4">pe</div>
+                <h2 class="text-xl font-black uppercase tracking-tight dark:text-white">Express Portal</h2>
+                <p class="text-[10px] uppercase tracking-widest opacity-50 mt-1 dark:text-gray-400">Admin or Agent Access</p>
+            </div>
+            <form id="login-form" class="space-y-4">
+                <input type="email" id="login-email" placeholder="LOGIN EMAIL" class="w-full px-4 py-3 text-[10px] font-bold tracking-widest uppercase border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 dark:text-white outline-none rounded-xl focus:border-red-600 transition-all" required>
+                <input type="password" id="login-pass" placeholder="PASSWORD" class="w-full px-4 py-3 text-[10px] font-bold tracking-widest uppercase border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 dark:text-white outline-none rounded-xl focus:border-red-600 transition-all" required>
+                <button type="submit" class="w-full py-4 text-xs font-bold uppercase tracking-[0.2em] text-white bg-black hover:bg-gray-800 dark:bg-red-600 dark:hover:bg-red-700 rounded-xl transition-all shadow-lg">Authorize Session</button>
+            </form>
+            <div class="mt-6 text-center">
+                <p class="text-[9px] opacity-40 uppercase tracking-widest dark:text-gray-500">Admin: admin@pyramidsexpress.com</p>
+            </div>
+            <button onclick="toggleAuthModal(false)" class="absolute top-6 right-6 opacity-30 hover:opacity-100 dark:text-white">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- --- App Logic --- -->
+    <script>
+        // --- State ---
+        let state = {
+            isLoggedIn: false,
+            isAdmin: false,
+            user: null,
+            darkMode: false,
+            currentPage: 'home',
+            materials: {
+                'orange-info': [
+                    { id: 1, title: 'Tariff 2024', desc: 'Current consumer rates', type: 'pdf' },
+                    { id: 2, title: 'Orange Cash Guide', desc: 'Digital wallet procedures', type: 'pdf' }
+                ],
+                'corporate': [
+                    { id: 3, title: 'IVR Setup', desc: 'Virtual solution overview', type: 'video' }
+                ],
+                'incentives': []
+            }
+        };
+
+        // --- Core Functions ---
+        function init() {
+            document.getElementById('year').textContent = new Date().getFullYear();
+            render();
+            lucide.createIcons();
+            
+            // Login Handler
+            document.getElementById('login-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const email = document.getElementById('login-email').value;
+                state.isLoggedIn = true;
+                if (email === 'admin@pyramidsexpress.com') {
+                    state.isAdmin = true;
+                    state.user = { name: 'System Admin', email };
+                    state.currentPage = 'admin-panel';
+                } else {
+                    state.isAdmin = false;
+                    state.user = { name: 'PE Agent', email };
+                    state.currentPage = 'agent-dashboard';
+                }
+                toggleAuthModal(false);
+                render();
+            });
+        }
+
+        function toggleTheme() {
+            state.darkMode = !state.darkMode;
+            document.documentElement.classList.toggle('dark', state.darkMode);
+            
+            const body = document.body;
+            const nav = document.getElementById('navbar');
+            const logoBox = document.getElementById('logo-box');
+            const brandName = document.getElementById('brand-name');
+            const footer = document.getElementById('main-footer');
+
+            if (state.darkMode) {
+                body.classList.replace('bg-white', 'bg-gray-950');
+                body.classList.replace('text-gray-900', 'text-white');
+                nav.className = "fixed top-0 w-full z-50 border-b border-gray-800 bg-black/90 backdrop-blur-md transition-all duration-300";
+                logoBox.className = "bg-red-600 text-white w-8 h-8 rounded-md flex items-center justify-center font-bold text-lg transition-colors duration-300";
+                brandName.className = "font-bold text-lg tracking-tight uppercase transition-colors duration-300 text-red-600";
+                footer.className = "py-12 mt-20 border-t border-gray-800 bg-black transition-colors duration-300";
+            } else {
+                body.classList.replace('bg-gray-950', 'bg-white');
+                body.classList.replace('text-white', 'text-gray-900');
+                nav.className = "fixed top-0 w-full z-50 border-b border-gray-100 bg-white/95 backdrop-blur-md transition-all duration-300";
+                logoBox.className = "bg-black text-white w-8 h-8 rounded-md flex items-center justify-center font-bold text-lg transition-colors duration-300";
+                brandName.className = "font-bold text-lg tracking-tight uppercase transition-colors duration-300 text-black";
+                footer.className = "py-12 mt-20 border-t border-gray-100 bg-gray-50 transition-colors duration-300";
+            }
+            
+            render(); // Refresh theme icons
+        }
+
+        function toggleAuthModal(show) {
+            const modal = document.getElementById('auth-modal');
+            modal.style.display = show ? 'flex' : 'none';
+        }
+
+        function navigateTo(page) {
+            state.currentPage = page;
+            render();
+            window.scrollTo(0, 0);
+        }
+
+        function logout() {
+            state.isLoggedIn = false;
+            state.isAdmin = false;
+            state.user = null;
+            state.currentPage = 'home';
+            render();
+        }
+
+        // --- Rendering Logic ---
+        function render() {
+            const root = document.getElementById('app-root');
+            const navLinks = document.getElementById('nav-links');
+            
+            // Render Navbar Links
+            let navHtml = `
+                <button onclick="navigateTo('home')" class="text-xs uppercase font-bold tracking-widest opacity-60 hover:text-red-600 transition-colors">Home</button>
+            `;
+            
+            if (state.isLoggedIn) {
+                if (state.isAdmin) {
+                    navHtml += `<button onclick="navigateTo('admin-panel')" class="text-xs uppercase font-bold tracking-widest text-red-600 flex items-center"><i data-lucide="settings" class="w-3.5 h-3.5 mr-1"></i> Management</button>`;
+                } else {
+                    navHtml += `<button onclick="navigateTo('agent-dashboard')" class="text-xs uppercase font-bold tracking-widest hover:text-red-600 transition-colors">Dashboard</button>`;
+                }
+                navHtml += `
+                    <div class="flex items-center space-x-4 border-l border-gray-200 dark:border-gray-800 pl-6">
+                        <span class="text-xs font-bold opacity-60">${state.user.name}</span>
+                        <button onclick="logout()" class="text-red-600 hover:opacity-70 transition-opacity"><i data-lucide="log-out" class="w-4 h-4"></i></button>
+                    </div>
+                `;
+            } else {
+                navHtml += `<button onclick="toggleAuthModal(true)" class="px-4 py-1.5 rounded text-xs font-bold uppercase tracking-widest ${state.darkMode ? 'bg-red-600 text-white' : 'bg-black text-white'} transition-colors">Agent Login</button>`;
+            }
+            navLinks.innerHTML = navHtml;
+
+            // Render Page Content
+            if (state.currentPage === 'home') {
+                root.innerHTML = renderHome();
+            } else if (state.currentPage === 'agent-dashboard') {
+                root.innerHTML = renderDashboard();
+            } else if (state.currentPage === 'admin-panel') {
+                root.innerHTML = renderAdmin();
+            } else if (state.currentPage.startsWith('service-')) {
+                root.innerHTML = renderServiceDetail(state.currentPage.replace('service-', ''));
+            }
+
+            lucide.createIcons();
+        }
+
+        // --- Page Components ---
+        function renderHome() {
+            const gradient = state.darkMode ? 'from-black to-red-900' : 'from-black to-orange-600';
+            return `
+                <div class="fade-in">
+                    <section class="relative h-[450px] w-full mt-0 overflow-hidden flex items-center justify-center">
+                        <div class="absolute inset-0 z-0">
+                            <img src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=2000" class="w-full h-full object-cover brightness-[0.4]" alt="Team">
+                            <div class="absolute inset-0 opacity-40 bg-gradient-to-r ${gradient}"></div>
+                        </div>
+                        <div class="relative z-10 text-center px-4">
+                            <div class="mb-4 inline-block bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-1 rounded text-[10px] font-bold uppercase tracking-[0.2em] text-white">Orange Egypt Partner</div>
+                            <h1 class="text-5xl md:text-7xl font-black text-white uppercase tracking-tighter leading-none mb-4">One <span class="text-red-600">Team</span> One <span class="text-red-600">Goal</span></h1>
+                            <p class="text-white text-lg md:text-xl font-light tracking-wide uppercase opacity-90">Reliability & Excellence</p>
+                            <button onclick="toggleAuthModal(true)" class="mt-8 bg-red-600 text-white px-8 py-3 rounded font-bold uppercase text-xs tracking-widest hover:bg-red-700 transition-all shadow-2xl">Agent Portal Access</button>
+                        </div>
+                    </section>
+
+                    <div class="max-w-7xl mx-auto px-4 py-20 grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="group cursor-pointer relative aspect-[16/9] overflow-hidden rounded-xl">
+                            <img src="https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80&w=800" class="w-full h-full object-cover group-hover:scale-105 transition-transform" alt="Events">
+                            <div class="absolute inset-0 bg-black/40 flex items-center justify-center"><h2 class="text-white text-2xl font-black uppercase tracking-widest">Pyramids Events</h2></div>
+                        </div>
+                        <div class="group cursor-pointer bg-red-600 rounded-xl flex flex-col items-center justify-center p-8 text-white">
+                            <div class="w-24 h-24 bg-white rounded-full flex items-center justify-center text-red-600 font-black text-4xl mb-4">pe</div>
+                            <h2 class="text-2xl font-black uppercase tracking-widest">About Us</h2>
+                            <p class="text-center mt-2 opacity-80 text-sm">Leading Logistics Partner in Egypt</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderDashboard() {
+            const services = [
+                { id: 'medical', title: 'Medical Insurance', sub: 'Omega Care', icon: 'heart-pulse', type: 'link', url: 'https://lookerstudio.google.com/reporting/01d55067-0527-435e-9e17-5a692003f0b0?s=trQFr5asru8' },
+                { id: 'orange-info', title: 'Orange Info', sub: 'Sales & Tariffs', icon: 'globe', type: 'page' },
+                { id: 'corporate', title: 'Corporate Materials', sub: 'Internal', icon: 'briefcase', type: 'page' },
+                { id: 'incentives', title: 'Incentives', sub: 'Recognition', icon: 'award', type: 'page' }
+            ];
+
+            return `
+                <div class="max-w-7xl mx-auto px-4 py-12 fade-in">
+                    <div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8">
+                        <h2 class="text-3xl font-black uppercase tracking-tight mb-2">Agent Dashboard</h2>
+                        <p class="text-gray-500 text-sm uppercase tracking-widest">Authorized Access Only</p>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        ${services.map(s => `
+                            <div onclick="${s.type === 'link' ? `window.open('${s.url}', '_blank')` : `MapsTo('service-${s.id}')`}" 
+                                 class="group p-8 rounded-2xl border transition-all cursor-pointer ${state.darkMode ? 'bg-gray-900 border-gray-800 hover:border-red-600' : 'bg-white border-gray-100 hover:border-black shadow-sm hover:shadow-xl'}">
+                                <div class="w-14 h-14 rounded-xl flex items-center justify-center mb-6 transition-colors ${state.darkMode ? 'bg-red-600/10 text-red-600' : 'bg-black/5 text-black group-hover:bg-red-600 group-hover:text-white'}">
+                                    <i data-lucide="${s.icon}" class="w-8 h-8"></i>
+                                </div>
+                                <h3 class="font-black uppercase text-lg tracking-tight mb-1">${s.title}</h3>
+                                <p class="text-red-600 text-xs font-bold uppercase tracking-widest mb-6">${s.sub}</p>
+                                <div class="flex items-center text-xs font-bold uppercase tracking-widest group-hover:translate-x-2 transition-transform">
+                                    ${s.type === 'link' ? 'Open Link' : 'View Portal'} <i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderAdmin() {
+            return `
+                <div class="max-w-7xl mx-auto px-4 py-12 fade-in">
+                    <div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8">
+                        <h2 class="text-4xl font-black uppercase tracking-tight mb-2">Management</h2>
+                        <p class="text-red-600 text-xs font-bold uppercase tracking-widest">Platform Administrator Dashboard</p>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                        <!-- Form -->
+                        <div class="p-8 rounded-3xl border h-fit ${state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
+                            <h3 class="font-black uppercase tracking-widest text-sm mb-6 flex items-center">
+                                <i data-lucide="plus" class="w-5 h-5 mr-2 text-red-600"></i> New Material
+                            </h3>
+                            <form onsubmit="handleAdminUpload(event)" class="space-y-4">
+                                <div>
+                                    <label class="text-[10px] font-black uppercase opacity-50 block mb-2">Category</label>
+                                    <select id="adm-cat" class="w-full p-3 rounded-xl border text-xs font-bold uppercase ${state.darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}">
+                                        <option value="orange-info">Orange Info</option>
+                                        <option value="corporate">Corporate Materials</option>
+                                        <option value="incentives">Incentives</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-black uppercase opacity-50 block mb-2">Title</label>
+                                    <input id="adm-title" required class="w-full p-3 rounded-xl border text-xs ${state.darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}" placeholder="Material Title">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-black uppercase opacity-50 block mb-2">Type</label>
+                                    <div class="grid grid-cols-3 gap-2">
+                                        ${['photo', 'video', 'pdf'].map(t => `
+                                            <label class="flex flex-col items-center p-2 border rounded-xl cursor-pointer hover:border-red-600 text-[8px] font-bold uppercase">
+                                                <input type="radio" name="adm-type" value="${t}" required class="mb-1"> ${t}
+                                            </label>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                                <button type="submit" class="w-full bg-red-600 text-white py-4 rounded-xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-red-700 transition-all">Upload Material</button>
+                            </form>
+                        </div>
+
+                        <!-- List -->
+                        <div class="lg:col-span-2 space-y-6">
+                            ${Object.entries(state.materials).map(([cat, items]) => `
+                                <div class="p-6 rounded-3xl border ${state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100'}">
+                                    <h4 class="font-black uppercase tracking-widest text-[10px] mb-4 flex justify-between">
+                                        ${cat.replace('-', ' ')} <span class="text-red-600">${items.length} Items</span>
+                                    </h4>
+                                    <div class="space-y-2">
+                                        ${items.map(i => `
+                                            <div class="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+                                                <div class="flex items-center space-x-3">
+                                                    <i data-lucide="${i.type === 'pdf' ? 'file-text' : i.type === 'video' ? 'video' : 'image'}" class="w-4 h-4 text-red-600"></i>
+                                                    <span class="text-xs font-bold uppercase tracking-tighter">${i.title}</span>
+                                                </div>
+                                                <button onclick="handleDeleteMaterial('${cat}', ${i.id})" class="text-gray-400 hover:text-red-600 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderServiceDetail(catId) {
+            const items = state.materials[catId] || [];
+            return `
+                <div class="max-w-4xl mx-auto px-4 py-12 fade-in">
+                    <button onclick="navigateTo('agent-dashboard')" class="flex items-center text-xs font-bold uppercase tracking-widest text-red-600 mb-8 hover:opacity-70">
+                        <i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i> Back to Dashboard
+                    </button>
+                    <h1 class="text-4xl font-black uppercase tracking-tighter mb-12">${catId.replace('-', ' ')} <span class="text-red-600">Materials</span></h1>
+                    
+                    ${items.length === 0 ? `
+                        <div class="bg-gray-50 dark:bg-gray-900 rounded-3xl p-12 text-center border-2 border-dashed border-gray-200 dark:border-gray-800">
+                            <i data-lucide="award" class="w-12 h-12 mx-auto mb-4 text-red-600 opacity-30"></i>
+                            <h3 class="font-bold uppercase tracking-widest mb-2">No Items Found</h3>
+                            <p class="text-xs opacity-50">Updates will be posted by the admin soon.</p>
+                        </div>
+                    ` : `
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            ${items.map(i => `
+                                <div class="p-6 rounded-xl border ${state.darkMode ? 'bg-gray-900 border-gray-800 hover:bg-gray-800' : 'bg-white border-gray-100 hover:shadow-lg'} transition-all flex justify-between items-center group cursor-pointer">
+                                    <div>
+                                        <p class="text-xs font-bold uppercase tracking-widest mb-1">${i.title}</p>
+                                        <p class="text-[9px] font-medium opacity-40 uppercase tracking-tighter">${i.desc || 'System Resource'}</p>
+                                    </div>
+                                    <div class="text-red-600">
+                                        <i data-lucide="${i.type === 'pdf' ? 'file-text' : i.type === 'video' ? 'video' : 'image'}" class="w-5 h-5"></i>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
+                </div>
+            `;
+        }
+
+        // --- Event Handlers ---
+        function handleAdminUpload(e) {
+            e.preventDefault();
+            const cat = document.getElementById('adm-cat').value;
+            const title = document.getElementById('adm-title').value;
+            const type = document.querySelector('input[name="adm-type"]:checked').value;
+            
+            const newMaterial = { id: Date.now(), title, type, desc: 'Manually uploaded resource' };
+            state.materials[cat].push(newMaterial);
+            render();
+        }
+
+        function handleDeleteMaterial(cat, id) {
+            state.materials[cat] = state.materials[cat].filter(m => m.id !== id);
+            render();
+        }
+
+        // Initialize App
+        window.onload = init;
+    </script>
+</body>
+</html>
