@@ -159,7 +159,6 @@
             }, (err) => console.error("Firestore error:", err));
         }
 
-        // --- UI Logic Exported to Global ---
         window.handleLogin = async (e) => {
             e.preventDefault();
             const email = document.getElementById('login-email').value;
@@ -237,7 +236,6 @@
             modal.style.display = show ? 'flex' : 'none';
         };
 
-        // --- Render Engine ---
         function render() {
             const root = document.getElementById('app-root');
             const navLinks = document.getElementById('nav-links');
