@@ -455,7 +455,6 @@
             const select = document.getElementById('signup-area');
             if (!select) return;
             
-            // Source from state if seeded, else INITIAL_SHOP_DATA
             const source = window.state.shops.length > 0 
                 ? window.state.shops.map(s => s.areaManager)
                 : INITIAL_SHOP_DATA.map(s => s.manager);
@@ -718,7 +717,6 @@
                 { id: 'corporate', title: 'Corporate Materials', sub: 'Internal', icon: 'briefcase', type: 'page' },
                 { id: 'incentives', title: 'Incentives', sub: 'Recognition', icon: 'award', type: 'page' }
             ];
-            // FIXED: navigateTo instead of MapsTo
             return `<div class="max-w-7xl mx-auto px-4 py-12 fade-in"><div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8"><h2 class="text-3xl font-black uppercase tracking-tight mb-2 text-gray-900 dark:text-white">Agent Dashboard</h2><p class="text-gray-500 text-sm uppercase tracking-widest">Authorized Access Only</p></div><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">${services.map(s => `<div onclick="${s.type === 'link' ? `window.open('${s.url}', '_blank')` : `MapsTo('service-${s.id}')`}" class="group p-8 rounded-2xl border transition-all cursor-pointer ${window.state.darkMode ? 'bg-gray-900 border-gray-800 hover:border-red-600' : 'bg-white border-gray-100 hover:border-black shadow-sm hover:shadow-xl'}"><div class="w-14 h-14 rounded-xl flex items-center justify-center mb-6 transition-colors ${window.state.darkMode ? 'bg-red-600/10 text-red-600' : 'bg-black/5 text-black group-hover:bg-red-600 group-hover:text-white'}"><i data-lucide="${s.icon}" class="w-8 h-8"></i></div><h3 class="font-black uppercase text-lg tracking-tight mb-1">${s.title}</h3><p class="text-red-600 text-xs font-bold uppercase tracking-widest mb-6">${s.sub}</p><div class="flex items-center text-xs font-bold uppercase tracking-widest group-hover:translate-x-2 transition-transform">${s.type === 'link' ? 'Open Link' : 'View Portal'} <i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i></div></div>`).join('')}</div></div>`;
         }
 
