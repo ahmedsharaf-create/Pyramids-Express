@@ -16,6 +16,8 @@
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #ef4444; border-radius: 10px; }
         [v-cloak] { display: none; }
+        .iframe-container { position: relative; width: 100%; padding-bottom: 75%; height: 0; overflow: hidden; border-radius: 1.5rem; }
+        .iframe-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
     </style>
 </head>
 <body class="bg-white text-gray-900 overflow-x-hidden transition-colors duration-300">
@@ -654,6 +656,7 @@
             if (s.currentPage === 'home') root.innerHTML = renderHome();
             else if (s.currentPage === 'agent-dashboard') root.innerHTML = renderDashboard();
             else if (s.currentPage === 'admin-panel') root.innerHTML = renderAdmin();
+            else if (s.currentPage === 'service-medical') root.innerHTML = renderMedicalPortal();
             else if (s.currentPage.startsWith('service-')) root.innerHTML = renderServiceDetail(s.currentPage.replace('service-', ''));
 
             lucide.createIcons();
@@ -666,7 +669,7 @@
 
         function renderDashboard() {
             const services = [
-                { id: 'medical', title: 'Medical Insurance', sub: 'Omega Care Network', icon: 'heart-pulse', type: 'link', url: 'https://lookerstudio.google.com/reporting/01d55067-0527-435e-9e17-5a692003f0b0?s=trQFr5asru8' },
+                { id: 'medical', title: 'Medical Insurance', sub: 'Omega Care Network', icon: 'heart-pulse', type: 'page' },
                 { id: 'orange-info', title: 'Orange Info', sub: 'Sales & Tariffs', icon: 'globe', type: 'page' },
                 { id: 'corporate', title: 'Corporate Materials', sub: 'Solutions', icon: 'briefcase', type: 'page' },
                 { id: 'incentives', title: 'Incentives', sub: 'Rewards', icon: 'award', type: 'page' }
@@ -681,16 +684,37 @@
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     ${services.map(s => `
-                        <div onclick="${s.type === 'link' ? `window.open('${s.url}', '_blank')` : `MapsTo('service-${s.id}')`}" class="group p-8 rounded-2xl border transition-all cursor-pointer ${window.state.darkMode ? 'bg-gray-900 border-gray-800 hover:border-red-600' : 'bg-white border-gray-100 hover:border-black shadow-sm hover:shadow-xl'}">
+                        <div onclick="navigateTo('service-${s.id}')" class="group p-8 rounded-2xl border transition-all cursor-pointer ${window.state.darkMode ? 'bg-gray-900 border-gray-800 hover:border-red-600' : 'bg-white border-gray-100 hover:border-black shadow-sm hover:shadow-xl'}">
                             <div class="w-14 h-14 rounded-xl flex items-center justify-center mb-6 transition-colors ${window.state.darkMode ? 'bg-red-600/10 text-red-600' : 'bg-black/5 text-black group-hover:bg-red-600 group-hover:text-white'}">
                                 <i data-lucide="${s.icon}" class="w-8 h-8"></i>
                             </div>
                             <h3 class="font-black uppercase text-lg tracking-tight mb-1">${s.title}</h3>
                             <p class="text-red-600 text-xs font-bold uppercase tracking-widest mb-6">${s.sub}</p>
                             <div class="flex items-center text-xs font-bold uppercase tracking-widest group-hover:translate-x-2 transition-transform">
-                                ${s.type === 'link' ? 'Open Link' : 'View Portal'} <i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i>
+                                View Portal <i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i>
                             </div>
                         </div>`).join('')}
+                </div>
+            </div>`;
+        }
+
+        function renderMedicalPortal() {
+            return `<div class="max-w-7xl mx-auto px-4 py-12 fade-in">
+                <button onclick="navigateTo('agent-dashboard')" class="flex items-center text-xs font-bold uppercase tracking-widest text-red-600 mb-8 hover:opacity-70">
+                    <i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i> Back to Dashboard
+                </button>
+                <div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8">
+                    <h1 class="text-4xl font-black uppercase tracking-tighter text-gray-900 dark:text-white">Medical <span class="text-red-600">Insurance</span></h1>
+                    <p class="text-gray-500 text-xs uppercase font-bold tracking-widest mt-2">Omega Care Reporting System</p>
+                </div>
+                
+                <div class="iframe-container shadow-2xl border border-gray-100 dark:border-gray-800">
+                    <iframe src="https://lookerstudio.google.com/embed/reporting/01d55067-0527-435e-9e17-5a692003f0b0/page/N7h0D" allowfullscreen sandbox="allow-storage-access-by-user-activation allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+                </div>
+
+                <div class="mt-12 p-8 rounded-3xl bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
+                    <h3 class="text-sm font-black uppercase tracking-widest mb-4 dark:text-white">Quick Help</h3>
+                    <p class="text-xs opacity-60 leading-relaxed dark:text-gray-400">If the report fails to load, please ensure you are logged into your corporate Google account or check your internet connection. For medical emergencies, contact the hotlines provided in the Omega Care manual.</p>
                 </div>
             </div>`;
         }
