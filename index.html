@@ -602,12 +602,20 @@
             e.preventDefault();
             const cat = document.getElementById('adm-cat').value;
             const title = document.getElementById('adm-title').value;
+            const url = document.getElementById('adm-url').value;
             const type = document.querySelector('input[name="adm-type"]:checked').value;
             const id = Date.now().toString();
             try {
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'materials', id), { category: cat, title, type, createdAt: new Date().toISOString() });
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'materials', id), { 
+                    category: cat, 
+                    title, 
+                    type, 
+                    url: url || '#', 
+                    createdAt: new Date().toISOString() 
+                });
                 e.target.reset();
-            } catch (err) { alert("Upload failed."); }
+                alert("Resource posted successfully!");
+            } catch (err) { alert("Upload failed: " + err.message); }
         };
 
         window.handleDeleteUserAccess = async (id) => {
@@ -616,6 +624,10 @@
 
         window.handleDeleteShopEntry = async (id) => {
             if (confirm("Delete entry?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shops', id));
+        };
+
+        window.handleDeleteMaterial = async (id) => {
+            if (confirm("Delete this resource permanently?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'materials', id));
         };
 
         function render() {
@@ -687,6 +699,8 @@
             const users = window.state.users;
             const shops = window.state.shops;
             const requests = window.state.requests;
+            const allMaterials = Object.values(window.state.materials).flat();
+
             return `<div class="max-w-7xl mx-auto px-4 py-12 fade-in">
                 <div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8 flex justify-between items-end">
                     <div>
@@ -715,6 +729,7 @@
                                     <option value="incentives">Incentives</option>
                                 </select>
                                 <input id="adm-title" required placeholder="Resource Title" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
+                                <input id="adm-url" required placeholder="File URL (Google Drive/Direct Link)" class="w-full p-2.5 rounded-xl border text-[10px] font-bold ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
                                 <div class="flex justify-between p-2">
                                     <label class="text-[9px] dark:text-white flex items-center"><input type="radio" name="adm-type" value="photo" checked class="mr-1"> Photo</label>
                                     <label class="text-[9px] dark:text-white flex items-center"><input type="radio" name="adm-type" value="video" class="mr-1"> Video</label>
@@ -753,7 +768,24 @@
                         </div>
                         ` : ''}
 
-                        <!-- SHOP TABLE -->
+                        <!-- MANAGE RESOURCES -->
+                        <div class="p-6 rounded-3xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
+                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 dark:text-white">Active Resources</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                ${allMaterials.map(m => `
+                                    <div class="p-4 rounded-xl bg-gray-50 dark:bg-gray-800 flex justify-between items-center group">
+                                        <div class="overflow-hidden">
+                                            <p class="text-[10px] font-black uppercase dark:text-white truncate">${m.title}</p>
+                                            <p class="text-[8px] opacity-40 uppercase">${m.category}</p>
+                                        </div>
+                                        <button onclick="handleDeleteMaterial('${m.id}')" class="text-gray-400 hover:text-red-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                    </div>
+                                `).join('')}
+                                ${allMaterials.length === 0 ? '<p class="text-[10px] opacity-40 uppercase italic col-span-3">No resources found.</p>' : ''}
+                            </div>
+                        </div>
+
+                        <!-- SHOP REGISTRY -->
                         <div class="p-6 rounded-3xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
                             <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 flex justify-between dark:text-white">Shop Registry <span class="text-red-600">${shops.length} Entries</span></h4>
                             <div class="max-h-64 overflow-y-auto custom-scrollbar border rounded-xl">
@@ -797,10 +829,16 @@
                 <h1 class="text-4xl font-black uppercase tracking-tighter mb-12 text-gray-900 dark:text-white">${catId.replace('-', ' ')} <span class="text-red-600">Materials</span></h1>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     ${items.map(i => `
-                        <div class="p-6 rounded-xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800 hover:bg-gray-800' : 'bg-white border-gray-100 hover:shadow-lg'} transition-all flex justify-between items-center group cursor-pointer">
-                            <div><p class="text-xs font-bold uppercase tracking-widest mb-1 dark:text-white">${i.title}</p><p class="text-[9px] font-medium opacity-40 uppercase tracking-tighter dark:text-gray-500">System Resource</p></div>
-                            <div class="text-red-600"><i data-lucide="${i.type === 'pdf' ? 'file-text' : i.type === 'video' ? 'video' : 'image'}" class="w-5 h-5"></i></div>
+                        <div onclick="window.open('${i.url}', '_blank')" class="p-6 rounded-xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800 hover:bg-gray-800' : 'bg-white border-gray-100 hover:shadow-lg'} transition-all flex justify-between items-center group cursor-pointer">
+                            <div>
+                                <p class="text-xs font-bold uppercase tracking-widest mb-1 dark:text-white">${i.title}</p>
+                                <p class="text-[9px] font-medium opacity-40 uppercase tracking-tighter dark:text-gray-500">Resource Link</p>
+                            </div>
+                            <div class="text-red-600 group-hover:scale-110 transition-transform">
+                                <i data-lucide="${i.type === 'pdf' ? 'file-text' : i.type === 'video' ? 'video' : 'image'}" class="w-5 h-5"></i>
+                            </div>
                         </div>`).join('')}
+                    ${items.length === 0 ? '<div class="col-span-2 py-20 text-center opacity-30 uppercase font-black text-xs tracking-widest">No materials uploaded yet.</div>' : ''}
                 </div>
             </div>`;
         }
