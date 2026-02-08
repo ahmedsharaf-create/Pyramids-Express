@@ -87,27 +87,37 @@
     <!-- --- Firebase SDKs --- -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signOut, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
 
-        // --- Safe Configuration for Deployment ---
-        let firebaseConfig = {};
+        // --- Your Custom Configuration ---
+        const myFirebaseConfig = {
+            apiKey: "AIzaSyDDBFnDT5NDZdqqSfVA-uQ283DaagdneKc",
+            authDomain: "pyramids-express.firebaseapp.com",
+            projectId: "pyramids-express",
+            storageBucket: "pyramids-express.firebasestorage.app",
+            messagingSenderId: "899055026028",
+            appId: "1:899055026028:web:6863c2a063949936abbd49",
+            measurementId: "G-3ZR6009M3R"
+        };
+
+        // --- Safe Initialization for Environment Flexibility ---
+        let firebaseConfig = myFirebaseConfig;
+        
+        // Use environment variables if they exist (Canvas Preview), else use custom config
         try {
             if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-                firebaseConfig = JSON.parse(__firebase_config);
+                const envConfig = JSON.parse(__firebase_config);
+                if (envConfig.apiKey) firebaseConfig = envConfig;
             }
-        } catch (e) {
-            console.warn("Firebase config not found. Running in offline mode.");
-        }
+        } catch (e) {}
 
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        let app, auth, db;
-
-        if (firebaseConfig.apiKey) {
-            app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
-            db = getFirestore(app);
-        }
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'pyramids-express';
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const analytics = firebaseConfig.measurementId ? getAnalytics(app) : null;
 
         // --- Global State ---
         window.state = {
@@ -125,11 +135,11 @@
 
         // --- Auth Initialization ---
         async function initAuth() {
-            if (!auth) return;
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
+                    // Start anonymously if no token exists, to allow reading public data
                     await signInAnonymously(auth);
                 }
             } catch (error) {
@@ -137,26 +147,27 @@
             }
         }
 
-        if (auth) {
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    const isAdmin = user.email === 'admin@pyramidsexpress.com';
-                    window.state.user = { uid: user.uid, email: user.email, name: isAdmin ? 'System Admin' : 'PE Agent' };
-                    window.state.isLoggedIn = !!user.email;
-                    window.state.isAdmin = isAdmin;
-                    setupDataSync();
-                } else {
-                    window.state.user = null;
-                    window.state.isLoggedIn = false;
-                    window.state.isAdmin = false;
-                }
-                render();
-            });
-        }
+        onAuthStateChanged(auth, (user) => {
+            if (user && user.email) {
+                const isAdmin = user.email === 'admin@pyramidsexpress.com';
+                window.state.user = { uid: user.uid, email: user.email, name: isAdmin ? 'System Admin' : 'PE Agent' };
+                window.state.isLoggedIn = true;
+                window.state.isAdmin = isAdmin;
+            } else {
+                window.state.user = user ? { uid: user.uid, name: 'Guest' } : null;
+                window.state.isLoggedIn = false;
+                window.state.isAdmin = false;
+            }
+            setupDataSync();
+            render();
+        });
 
         function setupDataSync() {
-            if (!auth || !auth.currentUser || !db) return;
+            if (!auth.currentUser) return;
+            
+            // Path follows Rule 1: /artifacts/{appId}/public/data/materials
             const publicDataRef = collection(db, 'artifacts', appId, 'public', 'data', 'materials');
+            
             onSnapshot(publicDataRef, (snapshot) => {
                 const newMaterials = {
                     'orange-info': [],
@@ -171,22 +182,44 @@
                 });
                 window.state.materials = newMaterials;
                 render();
-            }, (err) => console.error("Firestore error:", err));
+            }, (err) => console.error("Firestore sync error:", err));
         }
 
         // --- UI Logic Exported to Global ---
         window.handleLogin = async (e) => {
             e.preventDefault();
+            const btn = document.getElementById('auth-submit-btn');
             const email = document.getElementById('login-email').value;
-            window.state.isLoggedIn = true;
-            window.state.user = { email, name: email === 'admin@pyramidsexpress.com' ? 'System Admin' : 'PE Agent' };
-            window.state.isAdmin = email === 'admin@pyramidsexpress.com';
-            window.state.currentPage = window.state.isAdmin ? 'admin-panel' : 'agent-dashboard';
-            toggleAuthModal(false);
-            render();
+            const pass = document.getElementById('login-pass').value;
+            
+            btn.disabled = true;
+            btn.innerHTML = '<span class="animate-spin mr-2">◌</span> Authorizing...';
+
+            try {
+                // For actual Firebase usage on Vercel, this is the real method:
+                // await signInWithEmailAndPassword(auth, email, pass);
+                
+                // For demo/Canvas logic simulation:
+                window.state.isLoggedIn = true;
+                window.state.user = { email, name: email === 'admin@pyramidsexpress.com' ? 'System Admin' : 'PE Agent' };
+                window.state.isAdmin = email === 'admin@pyramidsexpress.com';
+                window.state.currentPage = window.state.isAdmin ? 'admin-panel' : 'agent-dashboard';
+                
+                toggleAuthModal(false);
+                render();
+            } catch (err) {
+                console.error("Login failed:", err);
+                alert("Login Error: Please check credentials.");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Authorize Session';
+            }
         };
 
         window.logout = async () => {
+            try {
+                await signOut(auth);
+            } catch (e) {}
             window.state.isLoggedIn = false;
             window.state.isAdmin = false;
             window.state.currentPage = 'home';
@@ -195,13 +228,16 @@
 
         window.handleAdminUpload = async (e) => {
             e.preventDefault();
-            if (!window.state.isAdmin || !db) return;
+            if (!window.state.isAdmin) return;
+
             const cat = document.getElementById('adm-cat').value;
             const title = document.getElementById('adm-title').value;
             const desc = document.getElementById('adm-desc').value;
             const type = document.querySelector('input[name="adm-type"]:checked').value;
+            
             const materialId = Date.now().toString();
             const materialRef = doc(db, 'artifacts', appId, 'public', 'data', 'materials', materialId);
+            
             try {
                 await setDoc(materialRef, {
                     category: cat,
@@ -217,7 +253,7 @@
         };
 
         window.handleDeleteMaterial = async (id) => {
-            if (!window.state.isAdmin || !db) return;
+            if (!window.state.isAdmin) return;
             const materialRef = doc(db, 'artifacts', appId, 'public', 'data', 'materials', id);
             try {
                 await deleteDoc(materialRef);
@@ -252,7 +288,6 @@
             modal.style.display = show ? 'flex' : 'none';
         };
 
-        // --- Render Engine ---
         function render() {
             const root = document.getElementById('app-root');
             const navLinks = document.getElementById('nav-links');
