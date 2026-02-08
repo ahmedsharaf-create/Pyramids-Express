@@ -800,48 +800,85 @@
             const shopStats = filteredUsers.reduce((acc, u) => { acc[u.shopName] = (acc[u.shopName] || 0) + 1; return acc; }, {});
 
             return `<div class="max-w-7xl mx-auto px-4 py-12 fade-in">
-                <div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8"><h2 class="text-4xl font-black uppercase tracking-tight mb-2 dark:text-white">Management</h2><p class="text-red-600 text-xs font-bold uppercase tracking-widest">Administrator Hub</p></div>
+                <div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8 flex flex-col md:flex-row justify-between md:items-end">
+                    <div>
+                        <h2 class="text-4xl font-black uppercase tracking-tight mb-2 dark:text-white">Management</h2>
+                        <p class="text-red-600 text-xs font-bold uppercase tracking-widest">Administrator Hub</p>
+                    </div>
+                    <div class="mt-4 md:mt-0 flex gap-4">
+                        <div class="text-center px-6 py-2 border rounded-2xl bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
+                            <p class="text-[9px] font-black uppercase opacity-40">Agents</p>
+                            <p class="text-xl font-black text-red-600">${s.users.length}</p>
+                        </div>
+                        <div class="text-center px-6 py-2 border rounded-2xl bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
+                            <p class="text-[9px] font-black uppercase opacity-40">Locations</p>
+                            <p class="text-xl font-black text-orange-600">${s.shops.length}</p>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
                     <div class="lg:col-span-1 space-y-6">
+                         <!-- Registry Management -->
+                         <div class="p-6 rounded-2xl border ${s.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
+                            <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white text-orange-600 flex items-center">
+                                <i data-lucide="map" class="w-3.5 h-3.5 mr-2"></i> Shop & Manager Registry
+                            </h3>
+                            <form onsubmit="handleAdminAddShop(event)" class="space-y-3">
+                                <input id="adm-shop-manager" required placeholder="Area Manager Name" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:border-orange-600 outline-none transition-all">
+                                <input id="adm-shop-name" required placeholder="Shop Name (e.g. EXP Amria)" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:border-orange-600 outline-none transition-all">
+                                <button type="submit" class="w-full bg-orange-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-700 transition-colors shadow-lg shadow-orange-600/20">Add Shop to Registry</button>
+                            </form>
+                            <div class="mt-6 space-y-2">
+                                <p class="text-[8px] font-black uppercase opacity-40 mb-2 border-b border-gray-100 dark:border-gray-800 pb-1">Live Shop Table (${s.shops.length})</p>
+                                <div class="max-h-[250px] overflow-y-auto custom-scrollbar space-y-1.5 pr-1">
+                                    ${s.shops.map(shop => `
+                                        <div class="flex justify-between items-center p-2.5 bg-gray-50 dark:bg-gray-800 rounded-xl group border border-transparent hover:border-orange-100 dark:hover:border-orange-900 transition-all">
+                                            <div class="overflow-hidden">
+                                                <p class="text-[9px] font-black uppercase truncate dark:text-white leading-none mb-1">${shop.shopName}</p>
+                                                <p class="text-[8px] opacity-40 truncate font-bold uppercase">${shop.areaManager}</p>
+                                            </div>
+                                            <button onclick="handleDeleteShop('${shop.id}')" class="text-gray-400 hover:text-red-600 transition-colors">
+                                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                            </button>
+                                        </div>
+                                    `).join('')}
+                                    ${s.shops.length === 0 ? '<p class="text-center py-4 text-[9px] font-black opacity-20 uppercase tracking-widest">Registry Empty</p>' : ''}
+                                </div>
+                            </div>
+                         </div>
+
                          <!-- File Upload -->
                          <div class="p-6 rounded-2xl border ${s.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                            <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white">Direct File Upload</h3>
+                            <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white flex items-center"><i data-lucide="file-up" class="w-3.5 h-3.5 mr-2"></i> Content Manager</h3>
                             <form onsubmit="handleAdminUpload(event)" class="space-y-3">
                                 <select id="adm-cat" class="w-full p-2.5 rounded-xl border text-[10px] font-bold uppercase dark:bg-gray-800 dark:border-gray-700 dark:text-white"><option value="orange-info">Orange Info</option><option value="corporate">Corporate</option><option value="incentives">Incentives</option><option value="heroes">Pyramids Heroes</option><option value="events">Pyramids Events</option></select>
                                 <input id="adm-title" required placeholder="Resource Title" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
-                                <label for="adm-file" class="w-full flex items-center justify-center p-4 border-2 border-dashed rounded-xl cursor-pointer hover:border-red-600 transition-colors ${s.darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'}"><div class="text-center"><i data-lucide="file-up" class="w-6 h-6 mx-auto mb-2 opacity-40"></i><span id="file-status-text" class="text-[9px] font-black uppercase tracking-widest opacity-60 dark:text-gray-400">Select File</span></div><input type="file" id="adm-file" onchange="handleFileSelect(this)" class="hidden" accept="image/*,video/*,application/pdf"></label>
+                                <label for="adm-file" class="w-full flex items-center justify-center p-4 border-2 border-dashed rounded-xl cursor-pointer hover:border-red-600 transition-colors ${s.darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'}"><div class="text-center"><i data-lucide="upload-cloud" class="w-6 h-6 mx-auto mb-2 opacity-40"></i><span id="file-status-text" class="text-[9px] font-black uppercase tracking-widest opacity-60 dark:text-gray-400">Select File</span></div><input type="file" id="adm-file" onchange="handleFileSelect(this)" class="hidden" accept="image/*,video/*,application/pdf"></label>
                                 <div class="flex justify-between p-2"><label class="text-[9px] dark:text-white flex items-center"><input type="radio" name="adm-type" value="photo" checked class="mr-1"> Photo</label><label class="text-[9px] dark:text-white flex items-center"><input type="radio" name="adm-type" value="video" class="mr-1"> Video</label><label class="text-[9px] dark:text-white flex items-center"><input type="radio" name="adm-type" value="pdf" class="mr-1"> PDF</label></div>
-                                <button type="submit" class="w-full bg-red-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest">Publish Resource</button>
+                                <button type="submit" class="w-full bg-red-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest">Publish Content</button>
                             </form>
                          </div>
-                         <!-- Registry Management (NEW) -->
-                         <div class="p-6 rounded-2xl border ${s.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                            <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white text-orange-600">Shop & Manager Registry</h3>
-                            <form onsubmit="handleAdminAddShop(event)" class="space-y-3">
-                                <input id="adm-shop-manager" required placeholder="Area Manager Name" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
-                                <input id="adm-shop-name" required placeholder="Shop Name (e.g. EXP Amria)" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
-                                <button type="submit" class="w-full bg-orange-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-700">Add Shop to Registry</button>
-                            </form>
-                            <div class="mt-6 space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar">
-                                <p class="text-[8px] font-black uppercase opacity-40">Current Registry (${s.shops.length})</p>
-                                ${s.shops.map(shop => `<div class="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-800 rounded-lg"><div class="overflow-hidden"><p class="text-[8px] font-bold uppercase truncate dark:text-white">${shop.shopName}</p><p class="text-[7px] opacity-50 truncate">${shop.areaManager}</p></div><button onclick="handleDeleteShop('${shop.id}')" class="text-red-600 hover:opacity-70"><i data-lucide="trash-2" class="w-3 h-3"></i></button></div>`).join('')}
-                            </div>
-                         </div>
+
                          <!-- Create Account -->
                          <div class="p-6 rounded-2xl border ${s.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                            <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white text-blue-600">Manual Account Access</h3>
+                            <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white text-blue-600 flex items-center"><i data-lucide="user-plus" class="w-3.5 h-3.5 mr-2"></i> Manual Agent Entry</h3>
                             <form onsubmit="handleAdminCreateUser(event)" class="space-y-3">
-                                <input id="adm-create-name" required placeholder="Full Name" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white"><input id="adm-create-email" required type="email" placeholder="Email Address" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white"><input id="adm-create-pass" required placeholder="Password" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
-                                <select id="adm-create-area" onchange="updateSignupShops('adm-create-area', 'adm-create-shop')" class="w-full p-2.5 rounded-xl border text-[10px] font-bold uppercase dark:bg-gray-800 dark:border-gray-700 dark:text-white"><option value="">SELECT AREA</option></select><select id="adm-create-shop" class="w-full p-2.5 rounded-xl border text-[10px] font-bold uppercase dark:bg-gray-800 dark:border-gray-700 dark:text-white" disabled><option value="">SELECT SHOP</option></select>
-                                <button type="submit" class="w-full bg-blue-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest">Create Agent Access</button>
+                                <input id="adm-create-name" required placeholder="Full Name" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
+                                <input id="adm-create-email" required type="email" placeholder="Email Address" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
+                                <input id="adm-create-pass" required placeholder="Assigned Password" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
+                                <select id="adm-create-area" onchange="updateSignupShops('adm-create-area', 'adm-create-shop')" class="w-full p-2.5 rounded-xl border text-[10px] font-bold uppercase dark:bg-gray-800 dark:border-gray-700 dark:text-white"><option value="">SELECT AREA</option></select>
+                                <select id="adm-create-shop" class="w-full p-2.5 rounded-xl border text-[10px] font-bold uppercase dark:bg-gray-800 dark:border-gray-700 dark:text-white" disabled><option value="">SELECT SHOP</option></select>
+                                <button type="submit" class="w-full bg-blue-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-colors">Authorize Agent</button>
                             </form>
                          </div>
                     </div>
+
                     <div class="lg:col-span-3 space-y-8">
                         <!-- Dashboard Analytics -->
                         <div class="p-8 rounded-3xl border ${s.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
                             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-                                <h4 class="font-black uppercase tracking-widest text-[10px] dark:text-white flex items-center"><i data-lucide="bar-chart-2" class="w-4 h-4 mr-2 text-red-600"></i> Live User Distribution</h4>
+                                <h4 class="font-black uppercase tracking-widest text-[10px] dark:text-white flex items-center"><i data-lucide="bar-chart-2" class="w-4 h-4 mr-2 text-red-600"></i> Performance Matrix</h4>
                                 <div class="flex flex-wrap gap-2 w-full md:w-auto">
                                     <input id="filter-search" oninput="applyAdminFilters()" value="${s.adminFilters.search}" placeholder="SEARCH AGENT..." class="px-3 py-1.5 rounded-lg border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
                                     <select id="filter-area" onchange="updateSignupShops('filter-area', 'filter-shop'); applyAdminFilters();" class="px-3 py-1.5 rounded-lg border text-[10px] font-bold uppercase dark:bg-gray-800 dark:border-gray-700 dark:text-white"><option value="">ALL MANAGERS</option></select>
@@ -850,14 +887,66 @@
                                 </div>
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div><p class="text-[9px] font-black uppercase tracking-widest mb-3 opacity-40">By Area Manager</p><div class="space-y-2">${Object.entries(managerStats).map(([m, c]) => `<div class="flex justify-between items-center text-[10px] p-2 bg-gray-50 dark:bg-gray-800 rounded-lg"><span class="font-bold uppercase">${m}</span><span class="bg-black text-white px-2 py-0.5 rounded-md font-black">${c}</span></div>`).join('')}</div></div>
-                                <div><p class="text-[9px] font-black uppercase tracking-widest mb-3 opacity-40">By Shop Location</p><div class="space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar">${Object.entries(shopStats).map(([sh, c]) => `<div class="flex justify-between items-center text-[10px] p-2 bg-gray-50 dark:bg-gray-800 rounded-lg"><span class="font-bold uppercase">${sh}</span><span class="bg-red-600 text-white px-2 py-0.5 rounded-md font-black">${c}</span></div>`).join('')}</div></div>
+                                <div><p class="text-[9px] font-black uppercase tracking-widest mb-3 opacity-40">By Area Manager</p><div class="space-y-2">${Object.entries(managerStats).map(([m, c]) => `<div class="flex justify-between items-center text-[10px] p-2.5 bg-gray-50 dark:bg-gray-800 rounded-xl"><span class="font-bold uppercase">${m}</span><span class="bg-black text-white px-2 py-0.5 rounded-md font-black">${c}</span></div>`).join('')}</div></div>
+                                <div><p class="text-[9px] font-black uppercase tracking-widest mb-3 opacity-40">By Shop Location</p><div class="space-y-2 max-h-[250px] overflow-y-auto custom-scrollbar pr-1">${Object.entries(shopStats).map(([sh, c]) => `<div class="flex justify-between items-center text-[10px] p-2.5 bg-gray-50 dark:bg-gray-800 rounded-xl"><span class="font-bold uppercase">${sh}</span><span class="bg-red-600 text-white px-2 py-0.5 rounded-md font-black">${c}</span></div>`).join('')}</div></div>
                             </div>
                         </div>
+                        
                         <!-- Pending Applications -->
-                        ${requests.length > 0 ? `<div class="p-6 rounded-3xl border-2 border-red-600 ${s.darkMode ? 'bg-red-950/10' : 'bg-red-50'}"><h4 class="font-black uppercase tracking-widest text-[10px] mb-6 flex justify-between text-red-600">Pending Applications <span class="bg-red-600 text-white px-2 rounded-full">${requests.length}</span></h4><div class="grid grid-cols-1 md:grid-cols-2 gap-4">${requests.map(req => `<div class="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-red-100 shadow-sm flex justify-between items-center"><div><p class="text-xs font-black uppercase dark:text-white">${req.agentName}</p><p class="text-[10px] opacity-60 dark:text-gray-400 mb-1">${req.email}</p><p class="text-[8px] font-black uppercase text-red-600">${req.shopName}</p></div><div class="flex space-x-2"><button onclick='handleApproveRequest(${JSON.stringify(req).replace(/'/g, "&apos;")})' class="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-600 hover:text-white transition-all"><i data-lucide="check" class="w-4 h-4"></i></button><button onclick="handleRejectRequest('${req.id}')" class="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all"><i data-lucide="x" class="w-4 h-4"></i></button></div></div>`).join('')}</div></div>` : ''}
+                        ${requests.length > 0 ? `
+                        <div class="p-6 rounded-3xl border-2 border-red-600 ${s.darkMode ? 'bg-red-950/10' : 'bg-red-50'} animate-pulse">
+                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 flex justify-between text-red-600">Action Required: Pending Approvals <span class="bg-red-600 text-white px-2 rounded-full">${requests.length}</span></h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                ${requests.map(req => `
+                                    <div class="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-red-100 dark:border-red-900 shadow-sm flex justify-between items-center">
+                                        <div>
+                                            <p class="text-xs font-black uppercase dark:text-white leading-none mb-1">${req.agentName}</p>
+                                            <p class="text-[10px] opacity-60 dark:text-gray-400 mb-1 leading-none">${req.email}</p>
+                                            <p class="text-[8px] font-black uppercase text-red-600 tracking-wider">${req.shopName}</p>
+                                        </div>
+                                        <div class="flex space-x-2">
+                                            <button onclick='handleApproveRequest(${JSON.stringify(req).replace(/'/g, "&apos;")})' class="p-2.5 bg-green-50 text-green-600 rounded-xl hover:bg-green-600 hover:text-white transition-all shadow-sm"><i data-lucide="check" class="w-4 h-4"></i></button>
+                                            <button onclick="handleRejectRequest('${req.id}')" class="p-2.5 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm"><i data-lucide="x" class="w-4 h-4"></i></button>
+                                        </div>
+                                    </div>`).join('')}
+                            </div>
+                        </div>` : ''}
+
                         <!-- Agent Directory -->
-                        <div class="p-6 rounded-3xl border ${s.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}"><h4 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white">Active Agent Directory <span class="text-red-600 font-black ml-2">${filteredUsers.length} In View</span></h4><div class="grid grid-cols-1 md:grid-cols-2 gap-3">${filteredUsers.map(u => `<div class="p-4 rounded-xl bg-gray-50 dark:bg-gray-800 flex justify-between items-center"><div><p class="text-[10px] font-black uppercase dark:text-white leading-none mb-1">${u.agentName}</p><p class="text-[9px] opacity-60 dark:text-gray-400 mb-1">${u.email}</p><p class="text-[8px] font-black uppercase text-red-600">${u.shopName} | ${u.areaManager}</p></div><button onclick="handleDeleteUserAccess('${u.id}')" class="text-gray-400 hover:text-red-600 transition-colors"><i data-lucide="user-x" class="w-4 h-4"></i></button></div>`).join('')}</div></div>
+                        <div class="p-6 rounded-3xl border ${s.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
+                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white">Authorized Agent Registry <span class="text-red-600 font-black ml-2">${filteredUsers.length} Results</span></h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                ${filteredUsers.map(u => `
+                                    <div class="p-4 rounded-xl bg-gray-50 dark:bg-gray-800 border border-transparent hover:border-gray-200 dark:hover:border-gray-700 transition-all flex justify-between items-center">
+                                        <div>
+                                            <p class="text-[10px] font-black uppercase dark:text-white leading-none mb-1">${u.agentName}</p>
+                                            <p class="text-[9px] opacity-60 dark:text-gray-400 mb-1 leading-none">${u.email}</p>
+                                            <p class="text-[8px] font-black uppercase text-red-600 tracking-wider">${u.shopName} | ${u.areaManager}</p>
+                                        </div>
+                                        <button onclick="handleDeleteUserAccess('${u.id}')" class="text-gray-400 hover:text-red-600 transition-colors">
+                                            <i data-lucide="user-x" class="w-4 h-4"></i>
+                                        </button>
+                                    </div>`).join('')}
+                            </div>
+                        </div>
+
+                        <!-- Content Inventory -->
+                        <div class="p-6 rounded-3xl border ${s.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
+                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 dark:text-white">Portal Resource Inventory</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                ${allMaterials.map(m => `
+                                    <div class="p-4 rounded-xl bg-gray-50 dark:bg-gray-800 flex justify-between items-center group">
+                                        <div class="overflow-hidden">
+                                            <p class="text-[10px] font-black uppercase dark:text-white truncate leading-none mb-1">${m.title}</p>
+                                            <p class="text-[8px] opacity-40 uppercase font-bold">${m.category}</p>
+                                        </div>
+                                        <div class="flex space-x-2">
+                                            <button onclick='openViewer(${JSON.stringify(m).replace(/'/g, "&apos;")})' class="text-gray-400 hover:text-black dark:hover:text-white transition-colors"><i data-lucide="eye" class="w-4 h-4"></i></button>
+                                            <button onclick="handleDeleteMaterial('${m.id}')" class="text-gray-400 hover:text-red-600 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                        </div>
+                                    </div>`).join('')}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>`;
