@@ -179,7 +179,9 @@
             materials: {
                 'orange-info': [],
                 'corporate': [],
-                'incentives': []
+                'incentives': [],
+                'heroes': [],
+                'events': []
             },
             users: [],
             shops: [],
@@ -422,7 +424,7 @@
 
             const publicDataRef = collection(db, 'artifacts', appId, 'public', 'data', 'materials');
             materialUnsub = onSnapshot(publicDataRef, (snapshot) => {
-                const newMaterials = { 'orange-info': [], 'corporate': [], 'incentives': [] };
+                const newMaterials = { 'orange-info': [], 'corporate': [], 'incentives': [], 'heroes': [], 'events': [] };
                 snapshot.forEach((doc) => {
                     const data = doc.data();
                     if (newMaterials[data.category]) {
@@ -566,18 +568,6 @@
             }
         };
 
-        async function notifyAdminOfSignup(requestData) {
-            const adminEmail = "ahmedsharaf.pe@gmail.com";
-            try {
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notifications', Date.now().toString()), {
-                    to: adminEmail,
-                    type: 'signup_request',
-                    data: requestData,
-                    timestamp: new Date().toISOString()
-                });
-            } catch (e) {}
-        }
-
         window.handleSignUp = async (e) => {
             e.preventDefault();
             const btn = document.getElementById('signup-submit-btn');
@@ -590,14 +580,11 @@
             btn.innerHTML = 'Submitting...';
             try {
                 const requestId = Date.now().toString();
-                const reqObj = {
-                    id: requestId,
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', requestId), {
                     agentName: name, email, password: pass, areaManager: area, shopName: shop,
                     status: 'pending', createdAt: new Date().toISOString()
-                };
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', requestId), reqObj);
-                await notifyAdminOfSignup(reqObj);
-                alert("Application submitted! Wait for Admin approval. A notification has been sent to ahmedsharaf.pe@gmail.com");
+                });
+                alert("Application submitted! Wait for Admin approval.");
                 toggleAuthView('login');
                 e.target.reset();
             } catch (err) {
@@ -724,7 +711,7 @@
             if (!file) return;
 
             if (file.size > 750 * 1024) {
-                alert("File is too large! Due to Base64 encoding, please use files under 750KB.");
+                alert("File is too large! Max 750KB.");
                 input.value = '';
                 statusText.textContent = "Select File (< 750KB)";
                 return;
@@ -758,7 +745,6 @@
             setTimeout(() => {
                 body.innerHTML = '';
                 if (material.type === 'photo') {
-                    // All photos now view as A4 portrait
                     body.innerHTML = `<img src="${material.url}" class="a4-photo-view">`;
                 } else if (material.type === 'video') {
                     body.innerHTML = `<video src="${material.url}" controls class="max-w-full max-h-[70vh] m-8" autoplay></video>`;
@@ -803,6 +789,8 @@
             else if (s.currentPage === 'agent-dashboard') root.innerHTML = renderDashboard();
             else if (s.currentPage === 'admin-panel') root.innerHTML = renderAdmin();
             else if (s.currentPage === 'service-medical') root.innerHTML = renderMedicalPortal();
+            else if (s.currentPage === 'service-heroes') root.innerHTML = renderHeroesPortal();
+            else if (s.currentPage === 'service-events') root.innerHTML = renderEventsPortal();
             else if (s.currentPage.startsWith('service-')) root.innerHTML = renderServiceDetail(s.currentPage.replace('service-', ''));
 
             lucide.createIcons();
@@ -810,15 +798,37 @@
 
         function renderHome() {
             const gradient = window.state.darkMode ? 'from-black to-red-900' : 'from-black to-orange-600';
-            return `<div class="fade-in"><section class="relative h-[450px] w-full mt-0 overflow-hidden flex items-center justify-center"><div class="absolute inset-0 z-0"><img src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=2000" class="w-full h-full object-cover brightness-[0.4]" alt="Team"><div class="absolute inset-0 opacity-40 bg-gradient-to-r ${gradient}"></div></div><div class="relative z-10 text-center px-4"><div class="mb-4 inline-block bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-1 rounded text-[10px] font-bold uppercase tracking-[0.2em] text-white">Partner Orange Egypt</div><h1 class="text-5xl md:text-7xl font-black text-white uppercase tracking-tighter leading-none mb-4">One <span class="text-red-600">Team</span> One <span class="text-red-600">Goal</span></h1><p class="text-white text-lg md:text-xl font-light tracking-wide uppercase opacity-90">Reliability & Excellence</p><button onclick="toggleAuthModal(true)" class="mt-8 bg-red-600 text-white px-8 py-3 rounded font-bold uppercase text-xs tracking-widest hover:bg-red-700 transition-all shadow-2xl">Portal Access</button></div></section></div>`;
+            return `<div class="fade-in">
+                <section class="relative h-[550px] w-full mt-0 overflow-hidden flex items-center justify-center">
+                    <div class="absolute inset-0 z-0">
+                        <img src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=2000" class="w-full h-full object-cover brightness-[0.4]" alt="Team">
+                        <div class="absolute inset-0 opacity-40 bg-gradient-to-r ${gradient}"></div>
+                    </div>
+                    <div class="relative z-10 text-center px-4">
+                        <div class="mb-4 inline-block bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-1 rounded text-[10px] font-bold uppercase tracking-[0.2em] text-white">Partner Orange Egypt</div>
+                        <h1 class="text-5xl md:text-7xl font-black text-white uppercase tracking-tighter leading-none mb-4">One <span class="text-red-600">Team</span> One <span class="text-red-600">Goal</span></h1>
+                        <p class="text-white text-lg md:text-xl font-light tracking-wide uppercase opacity-90 mb-10">Reliability & Excellence</p>
+                        
+                        <div class="flex flex-wrap justify-center gap-4">
+                            <button onclick="navigateTo('service-heroes')" class="bg-white text-black px-8 py-3 rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-2xl flex items-center">
+                                <i data-lucide="award" class="w-4 h-4 mr-2"></i> Pyramids Heroes
+                            </button>
+                            <button onclick="navigateTo('service-events')" class="bg-white text-black px-8 py-3 rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-2xl flex items-center">
+                                <i data-lucide="camera" class="w-4 h-4 mr-2"></i> Pyramids Events
+                            </button>
+                            ${!window.state.isLoggedIn ? `<button onclick="toggleAuthModal(true)" class="bg-red-600 text-white px-8 py-3 rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-red-700 transition-all shadow-2xl">Agent Portal</button>` : ''}
+                        </div>
+                    </div>
+                </section>
+            </div>`;
         }
 
         function renderDashboard() {
             const services = [
-                { id: 'medical', title: 'Medical Insurance', sub: 'Omega Care Network', icon: 'heart-pulse', type: 'page' },
-                { id: 'orange-info', title: 'Orange Info', sub: 'Sales & Tariffs', icon: 'globe', type: 'page' },
-                { id: 'corporate', title: 'Corporate Materials', sub: 'Solutions', icon: 'briefcase', type: 'page' },
-                { id: 'incentives', title: 'Incentives', sub: 'Rewards', icon: 'award', type: 'page' }
+                { id: 'medical', title: 'Medical Insurance', sub: 'Omega Care Network', icon: 'heart-pulse' },
+                { id: 'orange-info', title: 'Orange Info', sub: 'Sales & Tariffs', icon: 'globe' },
+                { id: 'corporate', title: 'Corporate Materials', sub: 'Solutions', icon: 'briefcase' },
+                { id: 'incentives', title: 'Incentives', sub: 'Rewards', icon: 'award' }
             ];
             return `<div class="max-w-7xl mx-auto px-4 py-12 fade-in">
                 <div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8 flex justify-between items-end">
@@ -843,17 +853,51 @@
             </div>`;
         }
 
-        function renderMedicalPortal() {
+        function renderHeroesPortal() {
+            const items = window.state.materials['heroes'] || [];
             return `<div class="max-w-7xl mx-auto px-4 py-12 fade-in">
-                <button onclick="navigateTo('agent-dashboard')" class="flex items-center text-xs font-bold uppercase tracking-widest text-red-600 mb-8 hover:opacity-70">
-                    <i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i> Back to Dashboard
+                <button onclick="navigateTo('home')" class="flex items-center text-xs font-bold uppercase tracking-widest text-red-600 mb-8 hover:opacity-70">
+                    <i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i> Back Home
                 </button>
                 <div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8">
-                    <h1 class="text-4xl font-black uppercase tracking-tighter text-gray-900 dark:text-white">Medical <span class="text-red-600">Insurance</span></h1>
-                    <p class="text-gray-500 text-xs uppercase font-bold tracking-widest mt-2">Omega Care Reporting System</p>
+                    <h1 class="text-4xl font-black uppercase tracking-tighter text-gray-900 dark:text-white">Pyramids <span class="text-red-600">Heroes</span></h1>
+                    <p class="text-gray-500 text-xs uppercase font-bold tracking-widest mt-2">Recognizing Excellence & Achievement</p>
                 </div>
-                <div class="iframe-container shadow-2xl border border-gray-100 dark:border-gray-800">
-                    <iframe src="https://lookerstudio.google.com/embed/reporting/01d55067-0527-435e-9e17-5a692003f0b0/page/N7h0D" allowfullscreen sandbox="allow-storage-access-by-user-activation allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                    ${items.map(i => `
+                        <div onclick='openViewer(${JSON.stringify(i).replace(/'/g, "&apos;")})' class="group cursor-pointer">
+                            <div class="aspect-[210/297] bg-white border dark:bg-gray-900 dark:border-gray-800 rounded-2xl overflow-hidden mb-4 shadow-sm group-hover:shadow-2xl transition-all">
+                                <img src="${i.url}" class="w-full h-full object-cover">
+                            </div>
+                            <div class="px-2">
+                                <p class="text-sm font-black uppercase dark:text-white leading-tight mb-1">${i.title}</p>
+                                <div class="text-[9px] font-bold uppercase tracking-widest opacity-50 dark:text-gray-400">Certified Achiever</div>
+                            </div>
+                        </div>`).join('')}
+                    ${items.length === 0 ? '<div class="col-span-4 py-20 text-center opacity-30 uppercase font-black text-xs tracking-widest border-2 border-dashed rounded-3xl">No heroes announced yet.</div>' : ''}
+                </div>
+            </div>`;
+        }
+
+        function renderEventsPortal() {
+            const items = window.state.materials['events'] || [];
+            return `<div class="max-w-7xl mx-auto px-4 py-12 fade-in">
+                <button onclick="navigateTo('home')" class="flex items-center text-xs font-bold uppercase tracking-widest text-red-600 mb-8 hover:opacity-70">
+                    <i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i> Back Home
+                </button>
+                <div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8">
+                    <h1 class="text-4xl font-black uppercase tracking-tighter text-gray-900 dark:text-white">Pyramids <span class="text-red-600">Events</span></h1>
+                    <p class="text-gray-500 text-xs uppercase font-bold tracking-widest mt-2">Captured Moments & Memories</p>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    ${items.map(i => `
+                        <div onclick='openViewer(${JSON.stringify(i).replace(/'/g, "&apos;")})' class="relative group cursor-pointer aspect-video rounded-3xl overflow-hidden border dark:border-gray-800">
+                            <img src="${i.url}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-6 flex items-end">
+                                <p class="text-white text-[10px] font-black uppercase tracking-widest">${i.title}</p>
+                            </div>
+                        </div>`).join('')}
+                    ${items.length === 0 ? '<div class="col-span-3 py-20 text-center opacity-30 uppercase font-black text-xs tracking-widest border-2 border-dashed rounded-3xl">No events captured yet.</div>' : ''}
                 </div>
             </div>`;
         }
@@ -874,25 +918,22 @@
                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
                     <div class="lg:col-span-1 space-y-6">
                          <div class="p-6 rounded-2xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                            <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white">Quick Actions</h3>
-                            <button id="seed-db-btn" onclick="seedShopDatabase()" class="w-full bg-black text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-widest dark:bg-gray-800 mb-4">Sync Shop Database</button>
-                         </div>
-
-                         <div class="p-6 rounded-2xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                            <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white text-red-600">Post Material</h3>
+                            <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white">Direct File Upload</h3>
                             <form onsubmit="handleAdminUpload(event)" class="space-y-3">
-                                <select id="adm-cat" class="w-full p-2.5 rounded-xl border text-[10px] font-bold uppercase ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
+                                <select id="adm-cat" class="w-full p-2.5 rounded-xl border text-[10px] font-bold uppercase dark:bg-gray-800 dark:border-gray-700 dark:text-white">
                                     <option value="orange-info">Orange Info</option>
                                     <option value="corporate">Corporate</option>
                                     <option value="incentives">Incentives</option>
+                                    <option value="heroes">Pyramids Heroes</option>
+                                    <option value="events">Pyramids Events</option>
                                 </select>
-                                <input id="adm-title" required placeholder="Resource Title" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
+                                <input id="adm-title" required placeholder="Title / Name - Shop - Area" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
                                 <div class="relative w-full">
                                     <input type="file" id="adm-file" onchange="handleFileSelect(this)" class="hidden" accept="image/*,video/*,application/pdf">
                                     <label for="adm-file" class="w-full flex items-center justify-center p-4 border-2 border-dashed rounded-xl cursor-pointer hover:border-red-600 transition-colors ${window.state.darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'}">
                                         <div class="text-center">
                                             <i data-lucide="file-up" class="w-6 h-6 mx-auto mb-2 opacity-40"></i>
-                                            <span id="file-status-text" class="text-[9px] font-black uppercase tracking-widest opacity-60 dark:text-gray-400">Select File (< 750KB)</span>
+                                            <span id="file-status-text" class="text-[9px] font-black uppercase tracking-widest opacity-60 dark:text-gray-400">Select Photo (< 750KB)</span>
                                         </div>
                                     </label>
                                 </div>
@@ -901,7 +942,7 @@
                                     <label class="text-[9px] dark:text-white flex items-center"><input type="radio" name="adm-type" value="video" class="mr-1"> Video</label>
                                     <label class="text-[9px] dark:text-white flex items-center"><input type="radio" name="adm-type" value="pdf" class="mr-1"> PDF</label>
                                 </div>
-                                <button type="submit" class="w-full bg-red-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest">Publish Material</button>
+                                <button type="submit" class="w-full bg-red-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest">Publish Resource</button>
                             </form>
                          </div>
 
@@ -943,7 +984,7 @@
                         </div>` : ''}
 
                         <div class="p-6 rounded-3xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 dark:text-white">Resource Library</h4>
+                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 dark:text-white">Platform Inventory</h4>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 ${allMaterials.map(m => `
                                     <div class="p-4 rounded-xl bg-gray-50 dark:bg-gray-800 flex justify-between items-center group">
@@ -952,8 +993,8 @@
                                             <p class="text-[8px] opacity-40 uppercase">${m.category}</p>
                                         </div>
                                         <div class="flex space-x-2">
-                                            <button onclick='openViewer(${JSON.stringify(m).replace(/'/g, "&apos;")})' class="text-gray-400 hover:text-black dark:hover:text-white"><i data-lucide="eye" class="w-4 h-4"></i></button>
-                                            <button onclick="handleDeleteMaterial('${m.id}')" class="text-gray-400 hover:text-red-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                            <button onclick='openViewer(${JSON.stringify(m).replace(/'/g, "&apos;")})' class="text-gray-400 hover:text-black dark:hover:text-white transition-colors"><i data-lucide="eye" class="w-4 h-4"></i></button>
+                                            <button onclick="handleDeleteMaterial('${m.id}')" class="text-gray-400 hover:text-red-600 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                                         </div>
                                     </div>`).join('')}
                             </div>
@@ -995,7 +1036,7 @@
                                 <i data-lucide="${i.type === 'pdf' ? 'file-text' : i.type === 'video' ? 'video' : 'image'}" class="w-5 h-5"></i>
                             </div>
                         </div>`).join('')}
-                    ${items.length === 0 ? '<div class="col-span-2 py-20 text-center opacity-30 uppercase font-black text-xs tracking-widest">No materials published yet.</div>' : ''}
+                    ${items.length === 0 ? '<div class="col-span-2 py-20 text-center opacity-30 uppercase font-black text-xs tracking-widest">No materials uploaded yet.</div>' : ''}
                 </div>
             </div>`;
         }
