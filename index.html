@@ -374,11 +374,7 @@
             try {
                 if (!auth.currentUser) {
                     await signInAnonymously(auth).catch(err => {
-                        if (err.code === 'auth/configuration-not-found') {
-                            console.warn("Critical: Enable 'Anonymous' provider in Firebase Console.");
-                        } else {
-                            throw err;
-                        }
+                        console.warn("Auth warning:", err.message);
                     });
                 }
             } catch (error) {
@@ -422,7 +418,7 @@
                 });
                 window.state.materials = newMaterials;
                 render();
-            });
+            }, (error) => console.error("Materials sync error:", error));
 
             const usersRef = collection(db, 'artifacts', appId, 'public', 'data', 'users');
             userUnsub = onSnapshot(usersRef, (snapshot) => {
@@ -432,7 +428,7 @@
                 });
                 window.state.users = newUsers;
                 render();
-            });
+            }, (error) => console.error("Users sync error:", error));
 
             const shopsRef = collection(db, 'artifacts', appId, 'public', 'data', 'shops');
             shopUnsub = onSnapshot(shopsRef, (snapshot) => {
@@ -443,7 +439,7 @@
                 window.state.shops = newShops;
                 updateSignupManagers();
                 render();
-            });
+            }, (error) => console.error("Shops sync error:", error));
 
             const requestsRef = collection(db, 'artifacts', appId, 'public', 'data', 'requests');
             requestUnsub = onSnapshot(requestsRef, (snapshot) => {
@@ -453,7 +449,7 @@
                 });
                 window.state.requests = newRequests;
                 render();
-            });
+            }, (error) => console.error("Requests sync error:", error));
         }
 
         window.navigateTo = (page) => {
@@ -539,13 +535,7 @@
                 navigateTo('admin-panel');
             } catch (err) {
                 console.error("Login failed:", err);
-                if (err.code === 'auth/configuration-not-found') {
-                    alert("Firebase Error: Make sure BOTH 'Email/Password' AND 'Anonymous' providers are enabled in Authentication > Sign-in method.");
-                } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
-                    alert("Invalid email or password.");
-                } else {
-                    alert("Login Error: " + err.message);
-                }
+                alert("Login Error: " + err.message);
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = 'Authorize Session';
@@ -628,47 +618,65 @@
             const type = document.querySelector('input[name="adm-type"]:checked').value;
             
             if (!window.selectedFileData) {
-                alert("Please select a file to upload.");
+                alert("Error: No file selected. Please choose a file first.");
                 return;
             }
 
             const btn = e.target.querySelector('button[type="submit"]');
+            const originalText = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = "Uploading Data...";
+            btn.innerHTML = "Processing Upload...";
 
             try {
                 const id = Date.now().toString();
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'materials', id), { 
+                const materialRef = doc(db, 'artifacts', appId, 'public', 'data', 'materials', id);
+                
+                await setDoc(materialRef, { 
                     category: cat, 
-                    title, 
-                    type, 
+                    title: title, 
+                    type: type, 
                     url: window.selectedFileData, 
                     createdAt: new Date().toISOString() 
                 });
+                
                 e.target.reset();
                 window.selectedFileData = null;
                 alert("Resource posted successfully!");
             } catch (err) { 
-                alert("Upload failed. Ensure the file is small (under 1MB)."); 
+                console.error("Upload Error:", err);
+                if (err.message.includes("quota") || err.message.includes("large")) {
+                    alert("Upload failed: The file is too large. Firestore documents have a 1MB limit.");
+                } else {
+                    alert("Upload failed: " + err.message);
+                }
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = "Post Material";
+                btn.innerHTML = originalText;
             }
         };
 
         window.handleFileSelect = (input) => {
             const file = input.files[0];
+            const statusText = document.getElementById('file-status-text');
             if (!file) return;
 
-            if (file.size > 1024 * 1024) {
-                alert("File too large! Must be under 1MB for direct upload.");
+            // Safe limit for Base64 strings in Firestore is ~750KB because encoding adds 33%
+            if (file.size > 750 * 1024) {
+                alert("File is too large! Due to Base64 encoding, please use files under 750KB to stay within the 1MB Firestore limit.");
                 input.value = '';
+                statusText.textContent = "Select File (< 750KB)";
                 return;
             }
 
+            statusText.textContent = "Loading file...";
             const reader = new FileReader();
             reader.onload = (e) => {
                 window.selectedFileData = e.target.result;
+                statusText.textContent = "File Ready: " + file.name;
+            };
+            reader.onerror = () => {
+                alert("Error reading file.");
+                statusText.textContent = "Select File (< 750KB)";
             };
             reader.readAsDataURL(file);
         };
@@ -692,15 +700,18 @@
             const title = document.getElementById('viewer-title');
             
             title.textContent = material.title;
-            body.innerHTML = '';
+            body.innerHTML = '<div class="p-10 text-xs font-bold animate-pulse">Loading content...</div>';
 
-            if (material.type === 'photo') {
-                body.innerHTML = `<img src="${material.url}" class="max-w-full max-h-full object-contain">`;
-            } else if (material.type === 'video') {
-                body.innerHTML = `<video src="${material.url}" controls class="max-w-full max-h-full" autoplay></video>`;
-            } else if (material.type === 'pdf') {
-                body.innerHTML = `<iframe src="${material.url}" class="pdf-embed"></iframe>`;
-            }
+            setTimeout(() => {
+                body.innerHTML = '';
+                if (material.type === 'photo') {
+                    body.innerHTML = `<img src="${material.url}" class="max-w-full max-h-full object-contain">`;
+                } else if (material.type === 'video') {
+                    body.innerHTML = `<video src="${material.url}" controls class="max-w-full max-h-full" autoplay></video>`;
+                } else if (material.type === 'pdf') {
+                    body.innerHTML = `<iframe src="${material.url}" class="pdf-embed"></iframe>`;
+                }
+            }, 100);
 
             viewer.style.display = 'flex';
             lucide.createIcons();
@@ -709,7 +720,7 @@
         window.closeViewer = () => {
             const viewer = document.getElementById('media-viewer');
             const body = document.getElementById('viewer-body');
-            body.innerHTML = ''; // Clear source to stop videos/iframes
+            body.innerHTML = ''; // Clear source
             viewer.style.display = 'none';
         };
 
@@ -795,7 +806,7 @@
 
                 <div class="mt-12 p-8 rounded-3xl bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
                     <h3 class="text-sm font-black uppercase tracking-widest mb-4 dark:text-white">Quick Help</h3>
-                    <p class="text-xs opacity-60 leading-relaxed dark:text-gray-400">If the report fails to load, please ensure you are logged into your corporate Google account or check your internet connection. For medical emergencies, contact the hotlines provided in the Omega Care manual.</p>
+                    <p class="text-xs opacity-60 leading-relaxed dark:text-gray-400">If the report fails to load, please ensure you are logged into your corporate Google account. For medical emergencies, contact the hotlines provided in the Omega Care manual.</p>
                 </div>
             </div>`;
         }
@@ -840,7 +851,7 @@
                                     <label for="adm-file" class="w-full flex items-center justify-center p-4 border-2 border-dashed rounded-xl cursor-pointer hover:border-red-600 transition-colors ${window.state.darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'}">
                                         <div class="text-center">
                                             <i data-lucide="file-up" class="w-6 h-6 mx-auto mb-2 opacity-40"></i>
-                                            <span class="text-[9px] font-black uppercase tracking-widest opacity-60">Select File (< 1MB)</span>
+                                            <span id="file-status-text" class="text-[9px] font-black uppercase tracking-widest opacity-60">Select File (< 750KB)</span>
                                         </div>
                                     </label>
                                 </div>
@@ -869,7 +880,7 @@
                                                 <p class="text-[10px] font-medium opacity-60 dark:text-gray-400">${req.email}</p>
                                             </div>
                                             <div class="flex space-x-2">
-                                                <button onclick='handleApproveRequest(${JSON.stringify(req)})' class="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-600 hover:text-white transition-all"><i data-lucide="check" class="w-4 h-4"></i></button>
+                                                <button onclick='handleApproveRequest(${JSON.stringify(req).replace(/'/g, "&apos;")})' class="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-600 hover:text-white transition-all"><i data-lucide="check" class="w-4 h-4"></i></button>
                                                 <button onclick="handleRejectRequest('${req.id}')" class="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all"><i data-lucide="x" class="w-4 h-4"></i></button>
                                             </div>
                                         </div>
@@ -894,27 +905,12 @@
                                             <p class="text-[8px] opacity-40 uppercase">${m.category}</p>
                                         </div>
                                         <div class="flex space-x-2">
-                                            <button onclick='openViewer(${JSON.stringify(m)})' class="text-gray-400 hover:text-black dark:hover:text-white"><i data-lucide="eye" class="w-4 h-4"></i></button>
-                                            <button onclick="handleDeleteMaterial('${m.id}')" class="text-gray-400 hover:text-red-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                            <button onclick='openViewer(${JSON.stringify(m).replace(/'/g, "&apos;")})' class="text-gray-400 hover:text-black dark:hover:text-white transition-colors"><i data-lucide="eye" class="w-4 h-4"></i></button>
+                                            <button onclick="handleDeleteMaterial('${m.id}')" class="text-gray-400 hover:text-red-600 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                                         </div>
                                     </div>
                                 `).join('')}
                                 ${allMaterials.length === 0 ? '<p class="text-[10px] opacity-40 uppercase italic col-span-3">No resources found.</p>' : ''}
-                            </div>
-                        </div>
-
-                        <!-- SHOP REGISTRY -->
-                        <div class="p-6 rounded-3xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 flex justify-between dark:text-white">Shop Registry <span class="text-red-600">${shops.length} Entries</span></h4>
-                            <div class="max-h-64 overflow-y-auto custom-scrollbar border rounded-xl">
-                                <table class="w-full text-left text-[10px] uppercase font-bold">
-                                    <thead class="${window.state.darkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-50 text-gray-500'}">
-                                        <tr><th class="p-3">Shop</th><th class="p-3">Area Manager</th><th class="p-3"></th></tr>
-                                    </thead>
-                                    <tbody class="divide-y ${window.state.darkMode ? 'divide-gray-800' : 'divide-gray-100'}">
-                                        ${shops.map(s => `<tr class="dark:text-white"><td class="p-3">${s.shopName}</td><td class="p-3">${s.areaManager}</td><td class="p-3 text-right"><button onclick="handleDeleteShopEntry('${s.id}')" class="text-red-600"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></td></tr>`).join('')}
-                                    </tbody>
-                                </table>
                             </div>
                         </div>
 
@@ -947,7 +943,7 @@
                 <h1 class="text-4xl font-black uppercase tracking-tighter mb-12 text-gray-900 dark:text-white">${catId.replace('-', ' ')} <span class="text-red-600">Materials</span></h1>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     ${items.map(i => `
-                        <div onclick='openViewer(${JSON.stringify(i)})' class="p-6 rounded-xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800 hover:bg-gray-800' : 'bg-white border-gray-100 hover:shadow-lg'} transition-all flex justify-between items-center group cursor-pointer">
+                        <div onclick='openViewer(${JSON.stringify(i).replace(/'/g, "&apos;")})' class="p-6 rounded-xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800 hover:bg-gray-800' : 'bg-white border-gray-100 hover:shadow-lg'} transition-all flex justify-between items-center group cursor-pointer">
                             <div>
                                 <p class="text-xs font-bold uppercase tracking-widest mb-1 dark:text-white">${i.title}</p>
                                 <p class="text-[9px] font-medium opacity-40 uppercase tracking-tighter dark:text-gray-500">Preview Data</p>
