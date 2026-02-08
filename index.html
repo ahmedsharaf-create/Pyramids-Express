@@ -356,7 +356,7 @@
                 if (!auth.currentUser) {
                     await signInAnonymously(auth).catch(err => {
                         if (err.code === 'auth/configuration-not-found') {
-                            console.warn("Critical: Enable 'Anonymous' provider in Firebase Console -> Authentication -> Sign-in method.");
+                            console.warn("Critical: Enable 'Anonymous' provider in Firebase Console -> Authentication.");
                         } else {
                             throw err;
                         }
@@ -454,7 +454,13 @@
         window.updateSignupManagers = () => {
             const select = document.getElementById('signup-area');
             if (!select) return;
-            const managers = [...new Set(window.state.shops.map(s => s.areaManager))].sort();
+            
+            // Source from state if seeded, else INITIAL_SHOP_DATA
+            const source = window.state.shops.length > 0 
+                ? window.state.shops.map(s => s.areaManager)
+                : INITIAL_SHOP_DATA.map(s => s.manager);
+
+            const managers = [...new Set(source)].sort();
             
             select.innerHTML = '<option value="">SELECT AREA MANAGER</option>';
             managers.forEach(m => {
@@ -476,11 +482,16 @@
                 return;
             }
 
-            const filteredShops = window.state.shops.filter(s => s.areaManager === manager).sort((a,b) => a.shopName.localeCompare(b.shopName));
+            const source = window.state.shops.length > 0 ? window.state.shops : INITIAL_SHOP_DATA;
+            const filteredShops = source
+                .filter(s => (s.areaManager || s.manager) === manager)
+                .map(s => s.shopName || s.shop)
+                .sort();
+
             filteredShops.forEach(s => {
                 const opt = document.createElement('option');
-                opt.value = s.shopName;
-                opt.textContent = s.shopName.toUpperCase();
+                opt.value = s;
+                opt.textContent = s.toUpperCase();
                 shopSelect.appendChild(opt);
             });
             shopSelect.disabled = false;
