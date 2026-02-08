@@ -59,25 +59,57 @@
         </div>
     </footer>
 
-    <!-- --- Login Modal --- -->
+    <!-- --- Auth Modal (Login & Sign Up) --- -->
     <div id="auth-modal" class="fixed inset-0 z-[100] hidden items-center justify-center px-4">
         <div class="absolute inset-0 bg-black/90 backdrop-blur-sm" onclick="toggleAuthModal(false)"></div>
         <div class="relative w-full max-w-sm p-8 rounded-3xl shadow-2xl bg-white dark:bg-gray-900 transition-colors">
-            <div class="text-center mb-8">
-                <div class="bg-red-600 text-white w-12 h-12 rounded-xl flex items-center justify-center font-bold text-2xl mx-auto mb-4">pe</div>
-                <h2 class="text-xl font-black uppercase tracking-tight dark:text-white">Express Portal</h2>
-                <p class="text-[10px] uppercase tracking-widest opacity-50 mt-1 dark:text-gray-400">Admin or Agent Access</p>
+            
+            <div id="auth-view-login">
+                <div class="text-center mb-8">
+                    <div class="bg-red-600 text-white w-12 h-12 rounded-xl flex items-center justify-center font-bold text-2xl mx-auto mb-4">pe</div>
+                    <h2 class="text-xl font-black uppercase tracking-tight dark:text-white">Express Portal</h2>
+                    <p class="text-[10px] uppercase tracking-widest opacity-50 mt-1 dark:text-gray-400">Login to your account</p>
+                </div>
+                <form id="login-form" class="space-y-4">
+                    <input type="email" id="login-email" placeholder="EMAIL ADDRESS" class="w-full px-4 py-3 text-[10px] font-bold tracking-widest uppercase border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 dark:text-white outline-none rounded-xl focus:border-red-600 transition-all" required>
+                    <input type="password" id="login-pass" placeholder="PASSWORD" class="w-full px-4 py-3 text-[10px] font-bold tracking-widest uppercase border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 dark:text-white outline-none rounded-xl focus:border-red-600 transition-all" required>
+                    <button type="submit" id="auth-submit-btn" class="w-full py-4 text-xs font-bold uppercase tracking-[0.2em] text-white bg-black hover:bg-gray-800 dark:bg-red-600 dark:hover:bg-red-700 rounded-xl transition-all shadow-lg flex justify-center items-center">
+                        Authorize Session
+                    </button>
+                </form>
+                <div class="mt-6 text-center space-y-4">
+                    <button onclick="toggleAuthView('signup')" class="text-[10px] font-bold text-red-600 uppercase tracking-widest hover:underline">New Agent? Apply for access</button>
+                    <p class="text-[9px] opacity-40 uppercase tracking-widest dark:text-gray-500">Admin: admin@pyramidsexpress.com</p>
+                </div>
             </div>
-            <form id="login-form" class="space-y-4">
-                <input type="email" id="login-email" placeholder="EMAIL ADDRESS" class="w-full px-4 py-3 text-[10px] font-bold tracking-widest uppercase border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 dark:text-white outline-none rounded-xl focus:border-red-600 transition-all" required>
-                <input type="password" id="login-pass" placeholder="PASSWORD" class="w-full px-4 py-3 text-[10px] font-bold tracking-widest uppercase border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 dark:text-white outline-none rounded-xl focus:border-red-600 transition-all" required>
-                <button type="submit" id="auth-submit-btn" class="w-full py-4 text-xs font-bold uppercase tracking-[0.2em] text-white bg-black hover:bg-gray-800 dark:bg-red-600 dark:hover:bg-red-700 rounded-xl transition-all shadow-lg flex justify-center items-center">
-                    Authorize Session
-                </button>
-            </form>
-            <div class="mt-6 text-center">
-                <p class="text-[9px] opacity-40 uppercase tracking-widest dark:text-gray-500">Admin: admin@pyramidsexpress.com</p>
+
+            <div id="auth-view-signup" class="hidden">
+                <div class="text-center mb-6">
+                    <h2 class="text-xl font-black uppercase tracking-tight dark:text-white">Agent Application</h2>
+                    <p class="text-[10px] uppercase tracking-widest opacity-50 mt-1 dark:text-gray-400">Request account activation</p>
+                </div>
+                <form id="signup-form" class="space-y-3">
+                    <input type="text" id="signup-name" placeholder="FULL NAME" class="w-full px-4 py-2.5 text-[10px] font-bold tracking-widest uppercase border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 dark:text-white outline-none rounded-xl focus:border-red-600 transition-all" required>
+                    <input type="email" id="signup-email" placeholder="EMAIL ADDRESS" class="w-full px-4 py-2.5 text-[10px] font-bold tracking-widest uppercase border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 dark:text-white outline-none rounded-xl focus:border-red-600 transition-all" required>
+                    <input type="password" id="signup-pass" placeholder="PASSWORD" class="w-full px-4 py-2.5 text-[10px] font-bold tracking-widest uppercase border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 dark:text-white outline-none rounded-xl focus:border-red-600 transition-all" required>
+                    
+                    <select id="signup-area" onchange="updateSignupShops()" class="w-full px-4 py-2.5 text-[10px] font-bold tracking-widest uppercase border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 dark:text-white outline-none rounded-xl focus:border-red-600 transition-all" required>
+                        <option value="">SELECT AREA MANAGER</option>
+                    </select>
+
+                    <select id="signup-shop" class="w-full px-4 py-2.5 text-[10px] font-bold tracking-widest uppercase border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 dark:text-white outline-none rounded-xl focus:border-red-600 transition-all" required disabled>
+                        <option value="">SELECT SHOP</option>
+                    </select>
+
+                    <button type="submit" id="signup-submit-btn" class="w-full py-4 text-xs font-bold uppercase tracking-[0.2em] text-white bg-red-600 hover:bg-red-700 rounded-xl transition-all shadow-lg flex justify-center items-center mt-2">
+                        Submit Application
+                    </button>
+                </form>
+                <div class="mt-4 text-center">
+                    <button onclick="toggleAuthView('login')" class="text-[10px] font-bold opacity-60 uppercase tracking-widest hover:underline dark:text-white">Already registered? Login</button>
+                </div>
             </div>
+
             <button onclick="toggleAuthModal(false)" class="absolute top-6 right-6 opacity-30 hover:opacity-100 dark:text-white">
                 <i data-lucide="x" class="w-5 h-5"></i>
             </button>
@@ -87,7 +119,7 @@
     <!-- --- Firebase SDKs --- -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signOut, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
 
@@ -120,7 +152,8 @@
                 'incentives': []
             },
             users: [],
-            shops: [] 
+            shops: [],
+            requests: [] // Pending Agent Sign-ups
         };
 
         const INITIAL_SHOP_DATA = [
@@ -323,7 +356,7 @@
                 if (!auth.currentUser) {
                     await signInAnonymously(auth).catch(err => {
                         if (err.code === 'auth/configuration-not-found') {
-                            console.warn("Critical: Enable 'Anonymous' provider in Firebase Console.");
+                            console.warn("Critical: Enable 'Anonymous' provider in Firebase Console -> Authentication.");
                         } else {
                             throw err;
                         }
@@ -349,7 +382,7 @@
             render();
         });
 
-        let materialUnsub, userUnsub, shopUnsub;
+        let materialUnsub, userUnsub, shopUnsub, requestUnsub;
 
         function setupDataSync() {
             if (!auth.currentUser) return;
@@ -357,6 +390,7 @@
             if (materialUnsub) materialUnsub();
             if (userUnsub) userUnsub();
             if (shopUnsub) shopUnsub();
+            if (requestUnsub) requestUnsub();
 
             const publicDataRef = collection(db, 'artifacts', appId, 'public', 'data', 'materials');
             materialUnsub = onSnapshot(publicDataRef, (snapshot) => {
@@ -369,7 +403,7 @@
                 });
                 window.state.materials = newMaterials;
                 render();
-            }, (err) => console.error(err));
+            });
 
             const usersRef = collection(db, 'artifacts', appId, 'public', 'data', 'users');
             userUnsub = onSnapshot(usersRef, (snapshot) => {
@@ -379,7 +413,7 @@
                 });
                 window.state.users = newUsers;
                 render();
-            }, (err) => console.error(err));
+            });
 
             const shopsRef = collection(db, 'artifacts', appId, 'public', 'data', 'shops');
             shopUnsub = onSnapshot(shopsRef, (snapshot) => {
@@ -388,9 +422,69 @@
                     newShops.push({ id: doc.id, ...doc.data() });
                 });
                 window.state.shops = newShops;
+                updateSignupManagers();
                 render();
-            }, (err) => console.error(err));
+            });
+
+            const requestsRef = collection(db, 'artifacts', appId, 'public', 'data', 'requests');
+            requestUnsub = onSnapshot(requestsRef, (snapshot) => {
+                const newRequests = [];
+                snapshot.forEach((doc) => {
+                    newRequests.push({ id: doc.id, ...doc.data() });
+                });
+                window.state.requests = newRequests;
+                render();
+            });
         }
+
+        // --- Auth View Logic ---
+        window.toggleAuthView = (view) => {
+            const loginView = document.getElementById('auth-view-login');
+            const signupView = document.getElementById('auth-view-signup');
+            if (view === 'signup') {
+                loginView.classList.add('hidden');
+                signupView.classList.remove('hidden');
+                updateSignupManagers();
+            } else {
+                loginView.classList.remove('hidden');
+                signupView.classList.add('hidden');
+            }
+        };
+
+        window.updateSignupManagers = () => {
+            const select = document.getElementById('signup-area');
+            if (!select) return;
+            const managers = [...new Set(window.state.shops.map(s => s.areaManager))].sort();
+            
+            select.innerHTML = '<option value="">SELECT AREA MANAGER</option>';
+            managers.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = m.toUpperCase();
+                select.appendChild(opt);
+            });
+        };
+
+        window.updateSignupShops = () => {
+            const manager = document.getElementById('signup-area').value;
+            const shopSelect = document.getElementById('signup-shop');
+            if (!shopSelect) return;
+
+            shopSelect.innerHTML = '<option value="">SELECT SHOP</option>';
+            if (!manager) {
+                shopSelect.disabled = true;
+                return;
+            }
+
+            const filteredShops = window.state.shops.filter(s => s.areaManager === manager).sort((a,b) => a.shopName.localeCompare(b.shopName));
+            filteredShops.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.shopName;
+                opt.textContent = s.shopName.toUpperCase();
+                shopSelect.appendChild(opt);
+            });
+            shopSelect.disabled = false;
+        };
 
         // --- Database Seeding Tool ---
         window.seedShopDatabase = async () => {
@@ -435,10 +529,81 @@
                 navigateTo('admin-panel');
             } catch (err) {
                 console.error("Login failed:", err);
-                alert("Login Error: " + err.message);
+                if (err.code === 'auth/configuration-not-found') {
+                    alert("Firebase Configuration Error: Please enable 'Email/Password' authentication in your Firebase Console.");
+                } else {
+                    alert("Login Error: " + err.message);
+                }
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = 'Authorize Session';
+            }
+        };
+
+        window.handleSignUp = async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('signup-submit-btn');
+            const email = document.getElementById('signup-email').value;
+            const pass = document.getElementById('signup-pass').value;
+            const name = document.getElementById('signup-name').value;
+            const area = document.getElementById('signup-area').value;
+            const shop = document.getElementById('signup-shop').value;
+
+            btn.disabled = true;
+            btn.innerHTML = 'Processing Application...';
+
+            try {
+                const requestId = Date.now().toString();
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', requestId), {
+                    agentName: name,
+                    email: email,
+                    password: pass, 
+                    areaManager: area,
+                    shopName: shop,
+                    status: 'pending',
+                    createdAt: new Date().toISOString()
+                });
+
+                alert("Application submitted! Please wait for Admin approval.");
+                toggleAuthView('login');
+                e.target.reset();
+            } catch (err) {
+                console.error("Sign up error:", err);
+                alert("Submission failed: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Submit Application';
+            }
+        };
+
+        window.handleApproveRequest = async (request) => {
+            if (!window.state.isAdmin) return;
+            
+            try {
+                const userId = Date.now().toString();
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userId), {
+                    email: request.email,
+                    agentName: request.agentName,
+                    areaManager: request.areaManager,
+                    shopName: request.shopName,
+                    approvedAt: new Date().toISOString()
+                });
+
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', request.id));
+                alert("Agent access approved!");
+            } catch (err) {
+                console.error(err);
+                alert("Approval failed.");
+            }
+        };
+
+        window.handleRejectRequest = async (id) => {
+            if (!window.state.isAdmin) return;
+            if (!confirm("Are you sure you want to reject this application?")) return;
+            try {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', id));
+            } catch (err) {
+                console.error(err);
             }
         };
 
@@ -479,22 +644,6 @@
             try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shops', id)); } catch (err) { console.error(err); }
         };
 
-        window.handleAddUserAccess = async (e) => {
-            e.preventDefault();
-            if (!window.state.isAdmin) return;
-            const email = document.getElementById('new-user-email').value;
-            const agentName = document.getElementById('new-user-agent').value;
-            const areaManager = document.getElementById('new-user-area').value;
-            const shopName = document.getElementById('new-user-shop').value;
-            const id = Date.now().toString();
-            try {
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', id), { 
-                    email, agentName, areaManager, shopName, createdAt: new Date().toISOString() 
-                });
-                e.target.reset();
-            } catch (err) { console.error(err); }
-        };
-
         window.handleDeleteUserAccess = async (id) => {
             if (!window.state.isAdmin) return;
             try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', id)); } catch (err) { console.error(err); }
@@ -515,6 +664,7 @@
         window.toggleAuthModal = (show) => {
             const modal = document.getElementById('auth-modal');
             modal.style.display = show ? 'flex' : 'none';
+            if (show) toggleAuthView('login');
         };
 
         function render() {
@@ -526,7 +676,8 @@
             let navHtml = `<button onclick="navigateTo('home')" class="text-xs uppercase font-bold tracking-widest opacity-60 hover:text-red-600 transition-colors">Home</button>`;
             if (s.isLoggedIn) {
                 if (s.isAdmin) {
-                    navHtml += `<button onclick="navigateTo('admin-panel')" class="text-xs uppercase font-bold tracking-widest text-red-600 flex items-center"><i data-lucide="settings" class="w-3.5 h-3.5 mr-1"></i> Management</button>`;
+                    const badge = s.requests.length > 0 ? `<span class="ml-1.5 w-4 h-4 rounded-full bg-red-600 text-white text-[8px] flex items-center justify-center animate-pulse">${s.requests.length}</span>` : '';
+                    navHtml += `<button onclick="navigateTo('admin-panel')" class="text-xs uppercase font-bold tracking-widest text-red-600 flex items-center"><i data-lucide="settings" class="w-3.5 h-3.5 mr-1"></i> Management${badge}</button>`;
                 } else {
                     navHtml += `<button onclick="navigateTo('agent-dashboard')" class="text-xs uppercase font-bold tracking-widest hover:text-red-600 transition-colors">Dashboard</button>`;
                 }
@@ -556,7 +707,7 @@
                 { id: 'corporate', title: 'Corporate Materials', sub: 'Internal', icon: 'briefcase', type: 'page' },
                 { id: 'incentives', title: 'Incentives', sub: 'Recognition', icon: 'award', type: 'page' }
             ];
-            // FIXED: navigateTo error here
+            // CORRECTED: Fixed navigateTo here
             return `<div class="max-w-7xl mx-auto px-4 py-12 fade-in"><div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8"><h2 class="text-3xl font-black uppercase tracking-tight mb-2 text-gray-900 dark:text-white">Agent Dashboard</h2><p class="text-gray-500 text-sm uppercase tracking-widest">Authorized Access Only</p></div><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">${services.map(s => `<div onclick="${s.type === 'link' ? `window.open('${s.url}', '_blank')` : `MapsTo('service-${s.id}')`}" class="group p-8 rounded-2xl border transition-all cursor-pointer ${window.state.darkMode ? 'bg-gray-900 border-gray-800 hover:border-red-600' : 'bg-white border-gray-100 hover:border-black shadow-sm hover:shadow-xl'}"><div class="w-14 h-14 rounded-xl flex items-center justify-center mb-6 transition-colors ${window.state.darkMode ? 'bg-red-600/10 text-red-600' : 'bg-black/5 text-black group-hover:bg-red-600 group-hover:text-white'}"><i data-lucide="${s.icon}" class="w-8 h-8"></i></div><h3 class="font-black uppercase text-lg tracking-tight mb-1">${s.title}</h3><p class="text-red-600 text-xs font-bold uppercase tracking-widest mb-6">${s.sub}</p><div class="flex items-center text-xs font-bold uppercase tracking-widest group-hover:translate-x-2 transition-transform">${s.type === 'link' ? 'Open Link' : 'View Portal'} <i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i></div></div>`).join('')}</div></div>`;
         }
 
@@ -564,6 +715,8 @@
             const materials = Object.entries(window.state.materials);
             const users = window.state.users;
             const shops = window.state.shops;
+            const requests = window.state.requests;
+
             return `
                 <div class="max-w-7xl mx-auto px-4 py-12 fade-in">
                     <div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8">
@@ -573,11 +726,9 @@
 
                     <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
                         <div class="space-y-8 lg:sticky lg:top-24 h-fit">
-                            <!-- Database Tools Section -->
                             <div class="p-6 rounded-2xl border bg-gray-50 dark:bg-gray-900 dark:border-gray-800">
                                 <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white flex items-center"><i data-lucide="wrench" class="w-4 h-4 mr-2 text-red-600"></i> System Tools</h3>
                                 <button id="seed-db-btn" onclick="seedShopDatabase()" class="w-full bg-red-600 text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg">Initialize Shop Database</button>
-                                <p class="text-[8px] uppercase opacity-50 mt-2 text-center">Use this to auto-populate shops</p>
                             </div>
 
                             <div class="p-6 rounded-2xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
@@ -590,18 +741,56 @@
                             </div>
 
                             <div class="p-6 rounded-2xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                                <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white flex items-center"><i data-lucide="user-plus" class="w-4 h-4 mr-2 text-red-600"></i> New Agent Access</h3>
-                                <form onsubmit="handleAddUserAccess(event)" class="space-y-3">
-                                    <input id="new-user-agent" required placeholder="Agent Name" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
-                                    <input id="new-user-email" type="email" required placeholder="Login Email" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
-                                    <input id="new-user-area" placeholder="Area Manager" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
-                                    <input id="new-user-shop" placeholder="Shop Name" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
-                                    <button type="submit" class="w-full bg-red-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest">Register Access</button>
+                                <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white flex items-center"><i data-lucide="plus" class="w-4 h-4 mr-2 text-red-600"></i> New Material</h3>
+                                <form onsubmit="handleAdminUpload(event)" class="space-y-3">
+                                    <select id="adm-cat" class="w-full p-2.5 rounded-xl border text-[10px] font-bold uppercase ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
+                                        <option value="orange-info">Orange Info</option>
+                                        <option value="corporate">Corporate</option>
+                                        <option value="incentives">Incentives</option>
+                                    </select>
+                                    <input id="adm-title" required placeholder="Title" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
+                                    <div class="flex justify-between p-2">
+                                        <label class="text-[9px] dark:text-white"><input type="radio" name="adm-type" value="photo" checked> Photo</label>
+                                        <label class="text-[9px] dark:text-white"><input type="radio" name="adm-type" value="video"> Video</label>
+                                        <label class="text-[9px] dark:text-white"><input type="radio" name="adm-type" value="pdf"> PDF</label>
+                                    </div>
+                                    <button type="submit" class="w-full bg-red-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest">Upload</button>
                                 </form>
                             </div>
                         </div>
 
                         <div class="lg:col-span-3 space-y-8">
+                            <!-- PENDING REQUESTS SECTION -->
+                            ${requests.length > 0 ? `
+                            <div class="p-6 rounded-3xl border-2 border-red-600 ${window.state.darkMode ? 'bg-red-950/20' : 'bg-red-50'} shadow-lg animate-fade-in">
+                                <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 flex justify-between dark:text-white text-red-600">Pending Agent Access Requests <span class="bg-red-600 text-white px-2 rounded-full">${requests.length}</span></h4>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    ${requests.map(req => `
+                                        <div class="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-red-200 dark:border-red-900/50 shadow-sm flex flex-col">
+                                            <div class="flex justify-between items-start mb-3">
+                                                <div>
+                                                    <p class="text-xs font-black uppercase dark:text-white">${req.agentName}</p>
+                                                    <p class="text-[10px] font-medium opacity-60 dark:text-gray-400">${req.email}</p>
+                                                </div>
+                                                <div class="flex space-x-2">
+                                                    <button onclick='handleApproveRequest(${JSON.stringify(req)})' class="p-2 bg-green-100 text-green-600 rounded-lg hover:bg-green-600 hover:text-white transition-all"><i data-lucide="check" class="w-4 h-4"></i></button>
+                                                    <button onclick="handleRejectRequest('${req.id}')" class="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all"><i data-lucide="x" class="w-4 h-4"></i></button>
+                                                </div>
+                                            </div>
+                                            <div class="flex items-center space-x-4 pt-3 border-t border-gray-100 dark:border-gray-800">
+                                                <div class="flex items-center text-[9px] uppercase font-bold opacity-60 dark:text-gray-300">
+                                                    <i data-lucide="map-pin" class="w-3 h-3 mr-1"></i> ${req.shopName}
+                                                </div>
+                                                <div class="flex items-center text-[9px] uppercase font-bold opacity-60 dark:text-gray-300">
+                                                    <i data-lucide="shield-check" class="w-3 h-3 mr-1"></i> ${req.areaManager}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                            ` : ''}
+
                             <div class="p-6 rounded-3xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
                                 <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 flex justify-between dark:text-white">Shop Database <span class="text-red-600">${shops.length} Entries</span></h4>
                                 <div class="max-h-64 overflow-y-auto custom-scrollbar border rounded-xl">
@@ -617,9 +806,21 @@
                             </div>
 
                             <div class="p-6 rounded-3xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                                <h4 class="font-black uppercase tracking-widest text-[10px] mb-4 flex justify-between dark:text-white">Registered Agents <span class="text-red-600">${users.length} Users</span></h4>
+                                <h4 class="font-black uppercase tracking-widest text-[10px] mb-4 flex justify-between dark:text-white">Approved Agents <span class="text-red-600">${users.length} Users</span></h4>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    ${users.map(u => `<div class="p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 flex justify-between items-start"><div class="space-y-1"><p class="text-[10px] font-black uppercase dark:text-white">${u.agentName}</p><p class="text-[9px] opacity-60 dark:text-gray-400">${u.email}</p><p class="text-[8px] text-red-600">${u.shopName || 'No Shop'}</p></div><button onclick="handleDeleteUserAccess('${u.id}')" class="text-gray-400 hover:text-red-600"><i data-lucide="user-x" class="w-4 h-4"></i></button></div>`).join('')}
+                                    ${users.map(u => `
+                                        <div class="p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 flex justify-between items-start">
+                                            <div class="space-y-1">
+                                                <p class="text-[10px] font-black uppercase dark:text-white">${u.agentName}</p>
+                                                <p class="text-[9px] opacity-60 dark:text-gray-400">${u.email}</p>
+                                                <div class="flex space-x-2">
+                                                    <span class="text-[8px] bg-red-600/10 text-red-600 px-2 py-0.5 rounded-full">${u.shopName}</span>
+                                                    <span class="text-[8px] opacity-40 uppercase font-bold">${u.areaManager}</span>
+                                                </div>
+                                            </div>
+                                            <button onclick="handleDeleteUserAccess('${u.id}')" class="text-gray-400 hover:text-red-600"><i data-lucide="user-x" class="w-4 h-4"></i></button>
+                                        </div>
+                                    `).join('')}
                                 </div>
                             </div>
                         </div>
@@ -638,6 +839,7 @@
             render();
             lucide.createIcons();
             document.getElementById('login-form').addEventListener('submit', window.handleLogin);
+            document.getElementById('signup-form').addEventListener('submit', window.handleSignUp);
         };
     </script>
 </body>
