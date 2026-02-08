@@ -1,392 +1,970 @@
-import React, { useState, useEffect } from 'react';
-import { initializeApp } from 'firebase/app';
-import { 
-  getAuth, 
-  signInAnonymously, 
-  signInWithCustomToken, 
-  onAuthStateChanged, 
-  signOut, 
-  signInWithEmailAndPassword 
-} from 'firebase/auth';
-import { 
-  getFirestore, 
-  collection, 
-  doc, 
-  setDoc, 
-  onSnapshot, 
-  deleteDoc 
-} from 'firebase/firestore';
-import { 
-  getStorage, 
-  ref, 
-  uploadBytesResumable, 
-  getDownloadURL 
-} from 'firebase/storage';
-import { 
-  LogOut, 
-  ChevronRight,
-  Sun,
-  Moon,
-  ArrowLeft,
-  HeartPulse,
-  Briefcase,
-  FileText,
-  Award,
-  Plus,
-  Trash2,
-  FileUp,
-  Image as ImageIcon,
-  Video,
-  Settings,
-  Globe,
-  X,
-  Eye,
-  Loader2
-} from 'lucide-react';
-
-// --- Firebase Initialization ---
-const firebaseConfig = JSON.parse(__firebase_config);
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const storage = getStorage(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'pyramids-express-52a27';
-
-const App = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [showAuth, setShowAuth] = useState(false);
-  const [user, setUser] = useState(null);
-  const [darkMode, setDarkMode] = useState(false);
-  const [currentPage, setCurrentPage] = useState('home');
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
-  const [activeViewer, setActiveViewer] = useState(null);
-
-  const [materials, setMaterials] = useState({
-    'orange-info': [],
-    'corporate': [],
-    'incentives': []
-  });
-
-  useEffect(() => {
-    const initAuth = async () => {
-      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-        await signInWithCustomToken(auth, __initial_auth_token);
-      } else {
-        await signInAnonymously(auth);
-      }
-    };
-    initAuth();
-
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (currentUser && currentUser.email) {
-        setIsLoggedIn(true);
-        setIsAdmin(currentUser.email === 'admin@pyramidsexpress.com');
-        setUser({ 
-          name: currentUser.email === 'admin@pyramidsexpress.com' ? 'System Admin' : 'PE Agent', 
-          email: currentUser.email, 
-          uid: currentUser.uid 
-        });
-      } else {
-        setIsLoggedIn(false);
-        setIsAdmin(false);
-        setUser(currentUser ? { uid: currentUser.uid, name: 'Guest' } : null);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (!isLoggedIn) return;
-
-    const materialsRef = collection(db, 'artifacts', appId, 'public', 'data', 'materials');
-    const unsubscribe = onSnapshot(materialsRef, (snapshot) => {
-      const newMaterials = { 'orange-info': [], 'corporate': [], 'incentives': [] };
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        if (newMaterials[data.category]) {
-          newMaterials[data.category].push({ id: doc.id, ...data });
-        }
-      });
-      setMaterials(newMaterials);
-    });
-
-    return () => unsubscribe();
-  }, [isLoggedIn]);
-
-  const toggleTheme = () => {
-    setDarkMode(!darkMode);
-    document.documentElement.classList.toggle('dark');
-  };
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    const email = e.target[0].value;
-    const password = e.target[1].value;
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      setShowAuth(false);
-      setCurrentPage('admin-panel');
-    } catch (err) {
-      alert("Login Error: " + err.message);
-    }
-  };
-
-  const handleLogout = async () => {
-    await signOut(auth);
-    setCurrentPage('home');
-  };
-
-  const handleFileUpload = async (e) => {
-    e.preventDefault();
-    const formData = new FormData(e.target);
-    const file = e.target.file.files[0];
-    const category = formData.get('category');
-    const title = formData.get('title');
-    const desc = formData.get('desc');
-    const type = formData.get('type');
-
-    if (!file) return alert("Please select a file.");
-    
-    // Set 20MB Limit
-    const MAX_SIZE = 20 * 1024 * 1024; 
-    if (file.size > MAX_SIZE) {
-      return alert("File is too large! Maximum limit is 20MB.");
-    }
-
-    setIsUploading(true);
-    const storageRef = ref(storage, `uploads/${appId}/${Date.now()}_${file.name}`);
-    const uploadTask = uploadBytesResumable(storageRef, file);
-
-    uploadTask.on('state_changed', 
-      (snapshot) => {
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        setUploadProgress(Math.round(progress));
-      }, 
-      (error) => {
-        alert("Upload Failed: " + error.message);
-        setIsUploading(false);
-      }, 
-      async () => {
-        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-        const materialId = Date.now().toString();
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pyramids Express | Agent Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; transition: background-color 0.3s, color 0.3s; }
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); }
+        .dark .glass { background: rgba(0, 0, 0, 0.8); }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #ef4444; border-radius: 10px; }
+        [v-cloak] { display: none; }
+        .iframe-container { position: relative; width: 100%; padding-bottom: 75%; height: 0; overflow: hidden; border-radius: 1.5rem; }
+        .iframe-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
         
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'materials', materialId), {
-          category,
-          title,
-          desc,
-          type,
-          url: downloadURL,
-          createdAt: new Date().toISOString()
-        });
-        
-        setIsUploading(false);
-        setUploadProgress(0);
-        e.target.reset();
-        alert("Material uploaded successfully!");
-      }
-    );
-  };
+        /* Viewer styles */
+        .media-viewer-content { max-height: 80vh; max-width: 90vw; }
+        .pdf-embed { width: 100%; height: 70vh; border-radius: 0.5rem; }
+    </style>
+</head>
+<body class="bg-white text-gray-900 overflow-x-hidden transition-colors duration-300">
 
-  const deleteMaterial = async (id) => {
-    if (!window.confirm("Permanently delete this resource?")) return;
-    try {
-      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'materials', id));
-    } catch (err) {
-      alert("Delete failed.");
-    }
-  };
+    <!-- --- Navigation --- -->
+    <nav id="navbar" class="fixed top-0 w-full z-50 border-b border-gray-100 bg-white/95 backdrop-blur-md transition-all duration-300">
+        <div class="max-w-7xl mx-auto px-4 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-3 cursor-pointer" onclick="navigateTo('home')">
+                    <div id="logo-box" class="bg-black text-white w-8 h-8 rounded-md flex items-center justify-center font-bold text-lg transition-colors duration-300">pe</div>
+                    <span id="brand-name" class="font-bold text-lg tracking-tight uppercase transition-colors duration-300 text-black">Pyramids Express</span>
+                </div>
 
-  const Navbar = () => (
-    <nav className={`fixed top-0 w-full z-50 border-b transition-all duration-300 ${darkMode ? 'bg-black/90 border-gray-800' : 'bg-white/95 border-gray-100'}`}>
-      <div className="max-w-7xl mx-auto px-4 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setCurrentPage('home')}>
-            <div className={`${darkMode ? 'bg-red-600' : 'bg-black'} text-white w-8 h-8 rounded-md flex items-center justify-center font-bold text-lg`}>pe</div>
-            <span className={`font-bold text-lg tracking-tight uppercase ${darkMode ? 'text-red-600' : 'text-black'}`}>Pyramids Express</span>
-          </div>
-          <div className="hidden md:flex items-center space-x-6">
-            <button onClick={toggleTheme} className="p-2">{darkMode ? <Sun size={18} className="text-yellow-400" /> : <Moon size={18} className="text-gray-600" />}</button>
-            {isLoggedIn && !isAdmin && <button onClick={() => setCurrentPage('agent-dashboard')} className="text-xs uppercase font-bold tracking-widest hover:text-red-600">Dashboard</button>}
-            {isAdmin && <button onClick={() => setCurrentPage('admin-panel')} className="text-xs uppercase font-bold tracking-widest text-red-600 flex items-center"><Settings size={14} className="mr-1" /> Management</button>}
-            {!isLoggedIn ? (
-              <button onClick={() => setShowAuth(true)} className={`px-4 py-1.5 rounded text-xs font-bold uppercase tracking-widest ${darkMode ? 'bg-red-600 text-white' : 'bg-black text-white'}`}>Portal Login</button>
-            ) : (
-              <div className="flex items-center space-x-4">
-                <span className="text-xs font-bold opacity-60">{user?.name}</span>
-                <button onClick={handleLogout} className="text-red-600 p-1"><LogOut size={18} /></button>
-              </div>
-            )}
-          </div>
+                <div class="hidden md:flex items-center space-x-6">
+                    <button onclick="toggleTheme()" class="p-2 hover:opacity-70 transition-opacity">
+                        <i data-lucide="moon" id="theme-icon-desktop" class="w-5 h-5"></i>
+                    </button>
+                    <div id="nav-links" class="flex items-center space-x-6"></div>
+                </div>
+
+                <div class="md:hidden flex items-center space-x-4">
+                    <button onclick="toggleTheme()"><i data-lucide="moon" id="theme-icon-mobile" class="w-6 h-6"></i></button>
+                    <button onclick="toggleMobileMenu()"><i data-lucide="menu" class="w-6 h-6"></i></button>
+                </div>
+            </div>
         </div>
-      </div>
     </nav>
-  );
 
-  const MediaViewer = () => {
-    if (!activeViewer) return null;
-    return (
-      <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-black/95 backdrop-blur-md" onClick={() => setActiveViewer(null)}></div>
-        <div className="relative w-full max-w-5xl bg-black rounded-3xl overflow-hidden shadow-2xl flex flex-col">
-          <button onClick={() => setActiveViewer(null)} className="absolute top-6 right-6 text-white z-10 p-2 bg-black/50 rounded-full hover:bg-black transition-colors"><X size={24}/></button>
-          <div className="flex-1 flex items-center justify-center min-h-[60vh]">
-            {activeViewer.type === 'photo' && <img src={activeViewer.url} className="max-w-full max-h-[80vh] object-contain" alt={activeViewer.title} />}
-            {activeViewer.type === 'video' && <video src={activeViewer.url} controls autoPlay className="max-w-full max-h-[80vh]" />}
-            {activeViewer.type === 'pdf' && <iframe src={activeViewer.url} className="w-full h-[80vh] border-0" title="PDF Preview" />}
-          </div>
-          <div className="p-6 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 text-black dark:text-white">
-            <h3 className="font-black uppercase tracking-widest text-sm mb-1">{activeViewer.title}</h3>
-            <p className="text-xs opacity-60">{activeViewer.desc}</p>
-          </div>
-        </div>
-      </div>
-    );
-  };
+    <!-- --- Main Content Area --- -->
+    <div id="app-root" class="min-h-screen pt-16"></div>
 
-  const AdminPanel = () => (
-    <div className="mt-24 max-w-6xl mx-auto px-4 pb-20 animate-in fade-in duration-500">
-      <div className="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8 flex justify-between items-end">
-        <div>
-          <h2 className="text-4xl font-black uppercase tracking-tight mb-2">Management</h2>
-          <p className="text-red-600 text-xs font-bold uppercase tracking-widest">Administrator Dashboard</p>
-        </div>
-        <button onClick={() => setCurrentPage('agent-dashboard')} className="text-[10px] font-black uppercase tracking-widest px-4 py-2 border rounded-xl hover:bg-black hover:text-white transition-all">Agent View</button>
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        <div className={`p-8 rounded-3xl border h-fit ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}`}>
-          <h3 className="font-black uppercase tracking-widest text-sm mb-6 text-red-600 flex items-center"><Plus className="mr-2" size={18}/> Upload</h3>
-          <form onSubmit={handleFileUpload} className="space-y-5">
-            <select name="category" className={`w-full p-3 rounded-xl border text-xs font-bold uppercase ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
-              <option value="orange-info">Orange Info</option>
-              <option value="corporate">Corporate</option>
-              <option value="incentives">Incentives</option>
-            </select>
-            <input name="title" required placeholder="Title" className={`w-full p-3 rounded-xl border text-xs ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`} />
-            <textarea name="desc" placeholder="Description" className={`w-full p-3 rounded-xl border text-xs h-20 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`} />
-            <div className="flex justify-between text-[10px] font-bold uppercase opacity-60">
-              {['photo', 'video', 'pdf'].map(t => <label key={t} className="flex items-center cursor-pointer"><input type="radio" name="type" value={t} defaultChecked={t==='pdf'} className="mr-1" /> {t}</label>)}
-            </div>
-            <div className="relative border-2 border-dashed rounded-xl p-6 text-center hover:border-red-600 cursor-pointer bg-gray-50 dark:bg-gray-800">
-              <input type="file" name="file" className="absolute inset-0 opacity-0 cursor-pointer" required />
-              <FileUp className="mx-auto mb-2 opacity-30" />
-              <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Select File (Max 20MB)</span>
-            </div>
-            {isUploading && (
-              <div className="space-y-2 text-center">
-                <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden"><div className="bg-red-600 h-2 transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div></div>
-                <p className="text-[10px] font-black uppercase text-red-600">Uploading: {uploadProgress}%</p>
-              </div>
-            )}
-            <button type="submit" disabled={isUploading} className="w-full bg-red-600 text-white py-4 rounded-xl font-black uppercase text-xs tracking-widest shadow-xl disabled:opacity-50">
-              {isUploading ? <Loader2 className="animate-spin mx-auto" /> : 'Confirm Post'}
+    <!-- --- Media Viewer Modal --- -->
+    <div id="media-viewer" class="fixed inset-0 z-[150] hidden items-center justify-center px-4">
+        <div class="absolute inset-0 bg-black/95 backdrop-blur-md" onclick="closeViewer()"></div>
+        <div class="relative w-full max-w-5xl flex flex-col items-center">
+            <button onclick="closeViewer()" class="absolute -top-12 right-0 text-white flex items-center space-x-2 opacity-70 hover:opacity-100 transition-opacity">
+                <span class="text-[10px] font-bold uppercase tracking-widest">Close Preview</span>
+                <i data-lucide="x" class="w-6 h-6"></i>
             </button>
-          </form>
-        </div>
-        <div className="lg:col-span-2 space-y-6">
-          {Object.entries(materials).map(([cat, items]) => (
-            <div key={cat} className={`p-6 rounded-3xl border ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}`}>
-              <h4 className="font-black uppercase text-xs mb-4 text-red-600">{cat.replace('-', ' ')} ({items.length})</h4>
-              <div className="space-y-2">
-                {items.map(item => (
-                  <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800">
-                    <div className="flex items-center space-x-3">
-                      <span className="text-red-600">{item.type === 'video' ? <Video size={16}/> : item.type === 'pdf' ? <FileText size={16}/> : <ImageIcon size={16}/>}</span>
-                      <span className="text-xs font-bold uppercase">{item.title}</span>
-                    </div>
-                    <div className="flex space-x-1">
-                       <button onClick={() => setActiveViewer(item)} className="p-2 text-gray-400 hover:text-black dark:hover:text-white"><Eye size={16} /></button>
-                       <button onClick={() => deleteMaterial(item.id)} className="p-2 text-gray-400 hover:text-red-600"><Trash2 size={16} /></button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <div id="viewer-body" class="media-viewer-content w-full bg-white dark:bg-gray-900 rounded-3xl overflow-hidden shadow-2xl flex items-center justify-center">
+                <!-- Content injected here -->
             </div>
-          ))}
+            <div id="viewer-title" class="mt-4 text-white font-black uppercase tracking-widest text-sm"></div>
         </div>
-      </div>
     </div>
-  );
 
-  return (
-    <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-gray-950 text-white' : 'bg-white text-gray-900'}`}>
-      <Navbar />
-      <MediaViewer />
-
-      {currentPage === 'home' && (
-        <div className="mt-16 pt-32 text-center animate-in fade-in duration-1000">
-          <h1 className="text-6xl font-black uppercase tracking-tighter mb-4">Express <span className="text-red-600">Portal</span></h1>
-          <p className="opacity-60 uppercase tracking-[0.3em] text-xs">Pyramids Express Quality App</p>
-          <button onClick={() => setShowAuth(true)} className="mt-10 bg-red-600 text-white px-10 py-4 rounded-xl font-black uppercase text-xs tracking-widest shadow-2xl">Authorize Session</button>
+    <!-- --- Footer --- -->
+    <footer id="main-footer" class="py-12 mt-20 border-t border-gray-100 bg-gray-50 transition-colors duration-300">
+        <div class="max-w-7xl mx-auto px-4 text-center">
+            <div class="flex justify-center space-x-6 mb-8 text-gray-400">
+                <i data-lucide="linkedin" class="w-5 h-5 cursor-pointer hover:text-red-600 transition-colors"></i>
+                <i data-lucide="mail" class="w-5 h-5 cursor-pointer hover:text-red-600 transition-colors"></i>
+                <i data-lucide="map-pin" class="w-5 h-5 cursor-pointer hover:text-red-600 transition-colors"></i>
+            </div>
+            <p class="text-[10px] uppercase tracking-[0.3em] text-gray-400">© <span id="year"></span> Pyramids Express Quality App</p>
         </div>
-      )}
+    </footer>
 
-      {currentPage === 'agent-dashboard' && (
-        <div className="mt-24 max-w-7xl mx-auto px-4 pb-20 animate-in slide-in-from-bottom-4 duration-500">
-          <div className="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8 flex justify-between items-end">
-            <h2 className="text-3xl font-black uppercase tracking-tight">Agent Dashboard</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              { id: 'medical', title: 'Medical Insurance', sub: 'Omega Care', icon: <HeartPulse />, type: 'portal' },
-              { id: 'orange-info', title: 'Orange Info', sub: 'Sales & Tariffs', icon: <Globe /> },
-              { id: 'corporate', title: 'Corporate Materials', sub: 'Solutions', icon: <Briefcase /> },
-              { id: 'incentives', title: 'Incentives', sub: 'Rewards', icon: <Award /> }
-            ].map((s) => (
-              <div key={s.id} onClick={() => setCurrentPage(s.id === 'medical' ? 'service-medical' : `service-${s.id}`)} className={`group p-8 rounded-2xl border cursor-pointer transition-all ${darkMode ? 'bg-gray-900 border-gray-800 hover:border-red-600' : 'bg-white border-gray-100 hover:border-black shadow-sm hover:shadow-xl'}`}>
-                <div className={`w-14 h-14 rounded-xl flex items-center justify-center mb-6 ${darkMode ? 'bg-red-600/10 text-red-600' : 'bg-black/5 text-black group-hover:bg-red-600 group-hover:text-white'}`}>{s.icon}</div>
-                <h3 className="font-black uppercase text-lg mb-1">{s.title}</h3>
-                <p className="text-red-600 text-xs font-bold uppercase mb-6">{s.sub}</p>
-                <div className="flex items-center text-xs font-bold uppercase group-hover:translate-x-2 transition-transform">View Portal <ChevronRight size={14} className="ml-1" /></div>
-              </div>
-            ))}
-          </div>
+    <!-- --- Auth Modal (Login & Sign Up) --- -->
+    <div id="auth-modal" class="fixed inset-0 z-[100] hidden items-center justify-center px-4">
+        <div class="absolute inset-0 bg-black/90 backdrop-blur-sm" onclick="toggleAuthModal(false)"></div>
+        <div class="relative w-full max-sm:max-w-xs max-w-sm p-8 rounded-3xl shadow-2xl bg-white dark:bg-gray-900 transition-colors">
+            
+            <div id="auth-view-login">
+                <div class="text-center mb-8">
+                    <div class="bg-red-600 text-white w-12 h-12 rounded-xl flex items-center justify-center font-bold text-2xl mx-auto mb-4">pe</div>
+                    <h2 class="text-xl font-black uppercase tracking-tight dark:text-white">Express Portal</h2>
+                    <p class="text-[10px] uppercase tracking-widest opacity-50 mt-1 dark:text-gray-400">Login to your account</p>
+                </div>
+                <form id="login-form" class="space-y-4">
+                    <input type="email" id="login-email" placeholder="EMAIL ADDRESS" class="w-full px-4 py-3 text-[10px] font-bold tracking-widest uppercase border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 dark:text-white outline-none rounded-xl focus:border-red-600 transition-all" required>
+                    <input type="password" id="login-pass" placeholder="PASSWORD" class="w-full px-4 py-3 text-[10px] font-bold tracking-widest uppercase border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 dark:text-white outline-none rounded-xl focus:border-red-600 transition-all" required>
+                    <button type="submit" id="auth-submit-btn" class="w-full py-4 text-xs font-bold uppercase tracking-[0.2em] text-white bg-black hover:bg-gray-800 dark:bg-red-600 dark:hover:bg-red-700 rounded-xl transition-all shadow-lg flex justify-center items-center">
+                        Authorize Session
+                    </button>
+                </form>
+                <div class="mt-6 text-center space-y-4">
+                    <button onclick="toggleAuthView('signup')" class="text-[10px] font-bold text-red-600 uppercase tracking-widest hover:underline">New Agent? Apply for access</button>
+                    <p class="text-[9px] opacity-40 uppercase tracking-widest dark:text-gray-500">Admin: admin@pyramidsexpress.com</p>
+                </div>
+            </div>
+
+            <div id="auth-view-signup" class="hidden">
+                <div class="text-center mb-6">
+                    <h2 class="text-xl font-black uppercase tracking-tight dark:text-white">Agent Application</h2>
+                    <p class="text-[10px] uppercase tracking-widest opacity-50 mt-1 dark:text-gray-400">Request account activation</p>
+                </div>
+                <form id="signup-form" class="space-y-3">
+                    <input type="text" id="signup-name" placeholder="FULL NAME" class="w-full px-4 py-2.5 text-[10px] font-bold tracking-widest uppercase border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 dark:text-white outline-none rounded-xl focus:border-red-600 transition-all" required>
+                    <input type="email" id="signup-email" placeholder="EMAIL ADDRESS" class="w-full px-4 py-2.5 text-[10px] font-bold tracking-widest uppercase border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 dark:text-white outline-none rounded-xl focus:border-red-600 transition-all" required>
+                    <input type="password" id="signup-pass" placeholder="PASSWORD" class="w-full px-4 py-2.5 text-[10px] font-bold tracking-widest uppercase border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 dark:text-white outline-none rounded-xl focus:border-red-600 transition-all" required>
+                    
+                    <select id="signup-area" onchange="updateSignupShops()" class="w-full px-4 py-2.5 text-[10px] font-bold tracking-widest uppercase border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 dark:text-white outline-none rounded-xl focus:border-red-600 transition-all" required>
+                        <option value="">SELECT AREA MANAGER</option>
+                    </select>
+
+                    <select id="signup-shop" class="w-full px-4 py-2.5 text-[10px] font-bold tracking-widest uppercase border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 dark:text-white outline-none rounded-xl focus:border-red-600 transition-all" required disabled>
+                        <option value="">SELECT SHOP</option>
+                    </select>
+
+                    <button type="submit" id="signup-submit-btn" class="w-full py-4 text-xs font-bold uppercase tracking-[0.2em] text-white bg-red-600 hover:bg-red-700 rounded-xl transition-all shadow-lg flex justify-center items-center mt-2">
+                        Submit Application
+                    </button>
+                </form>
+                <div class="mt-4 text-center">
+                    <button onclick="toggleAuthView('login')" class="text-[10px] font-bold opacity-60 uppercase tracking-widest hover:underline dark:text-white">Already registered? Login</button>
+                </div>
+            </div>
+
+            <button onclick="toggleAuthModal(false)" class="absolute top-6 right-6 opacity-30 hover:opacity-100 dark:text-white">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
         </div>
-      )}
-
-      {currentPage === 'admin-panel' && <AdminPanel />}
-
-      {currentPage === 'service-medical' && (
-        <div className="mt-24 max-w-7xl mx-auto px-4 pb-20 animate-in fade-in duration-500">
-          <button onClick={() => setCurrentPage('agent-dashboard')} className="flex items-center text-xs font-bold uppercase tracking-widest text-red-600 mb-8"><ArrowLeft size={16} className="mr-2" /> Back</button>
-          <div className="aspect-video w-full rounded-3xl overflow-hidden border dark:border-gray-800 shadow-2xl">
-             <iframe src="https://lookerstudio.google.com/embed/reporting/01d55067-0527-435e-9e17-5a692003f0b0/page/N7h0D" className="w-full h-full" title="Medical Report" />
-          </div>
-        </div>
-      )}
-
-      {currentPage.startsWith('service-') && currentPage !== 'service-medical' && (
-        <div className="mt-24 max-w-4xl mx-auto px-4 pb-20 animate-in fade-in duration-500">
-          <button onClick={() => setCurrentPage('agent-dashboard')} className="flex items-center text-xs font-bold uppercase tracking-widest text-red-600 mb-8"><ArrowLeft size={16} className="mr-2" /> Back</button>
-          <h1 className="text-4xl font-black uppercase tracking-tighter mb-12">{currentPage.replace('service-', '').replace('-', ' ')} <span className="text-red-600">Resources</span></h1>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {materials[currentPage.replace('service-', '')]?.map(item => (
-              <div key={item.id} onClick={() => setActiveViewer(item)} className={`p-6 text-left rounded-xl border font-bold uppercase text-xs flex justify-between items-center cursor-pointer transition-all ${darkMode ? 'bg-gray-900 border-gray-800 hover:bg-gray-800' : 'bg-white border-gray-100 hover:shadow-lg'}`}>
-                <div><p className="mb-1">{item.title}</p><p className="text-[9px] font-normal opacity-40 lowercase">{item.desc}</p></div>
-                <div className="text-red-600">{item.type === 'video' ? <Video size={18} /> : item.type === 'pdf' ? <FileText size={18} /> : <ImageIcon size={18} />}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {showAuth && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center px-4">
-          <div className="absolute inset-0 bg-black/95 backdrop-blur-sm" onClick={() => setShowAuth(false)}></div>
-          <div className={`relative w-full max-w-sm p-8 rounded-3xl shadow-2xl transition-all ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
-            <h2 className="text-xl font-black uppercase text-center mb-6">Security Login</h2>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <input type="email" placeholder="EMAIL" className={`w-full p-4 rounded-xl border text-xs font-bold uppercase ${darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-100'}`} required />
-              <input type="password" placeholder="PASSWORD" className={`w-full p-4 rounded-xl border text-xs font-bold uppercase ${darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-100'}`} required />
-              <button type="submit" className="w-full py-4 bg-red-600 text-white rounded-xl font-black uppercase text-xs tracking-widest">Authorize</button>
-            </form>
-            <button onClick={() => setShowAuth(false)} className="absolute top-6 right-6 opacity-30 hover:opacity-100"><X size={20} /></button>
-          </div>
-        </div>
-      )}
     </div>
-  );
-};
 
-export default App;
+    <!-- --- Firebase SDKs --- -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD-1puhqN-3YUCx4PU2d0_Umb06g6Kacco",
+            authDomain: "pyramids-express-52a27.firebaseapp.com",
+            projectId: "pyramids-express-52a27",
+            storageBucket: "pyramids-express-52a27.firebasestorage.app",
+            messagingSenderId: "806262842725",
+            appId: "1:806262842725:web:97e8c0493d7b5d4a1bad8c"
+        };
+
+        const appId = "pyramids-express-52a27";
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        window.state = {
+            isLoggedIn: false,
+            isAdmin: false,
+            user: null,
+            darkMode: false,
+            currentPage: 'home',
+            materials: {
+                'orange-info': [],
+                'corporate': [],
+                'incentives': []
+            },
+            users: [],
+            shops: [],
+            requests: [] 
+        };
+
+        window.selectedFileData = null;
+
+        const INITIAL_SHOP_DATA = [
+            { shop: "EXP El Eskandrany", manager: "Abdallah Ibrahim" },
+            { shop: "EXP El Wardian", manager: "Abdallah Ibrahim" },
+            { shop: "EXP Elkabary", manager: "Abdallah Ibrahim" },
+            { shop: "EXP Karmouz", manager: "Abdallah Ibrahim" },
+            { shop: "EXP Karmoz", manager: "Abdallah Ibrahim" },
+            { shop: "OB. Bashayer Elkhair", manager: "Abdallah Ibrahim" },
+            { shop: "OB. Bawalino", manager: "Abdallah Ibrahim" },
+            { shop: "OB. El Werdian", manager: "Abdallah Ibrahim" },
+            { shop: "OB. Ghet Elenab", manager: "Abdallah Ibrahim" },
+            { shop: "OB. Moharam beck", manager: "Abdallah Ibrahim" },
+            { shop: "EXP El Bahr El Azam", manager: "Ahmed Bahgat" },
+            { shop: "EXP Embaba 2", manager: "Ahmed Bahgat" },
+            { shop: "EXP Giza Mall", manager: "Ahmed Bahgat" },
+            { shop: "EXP Hawamdya", manager: "Ahmed Bahgat" },
+            { shop: "EXP Imbaba", manager: "Ahmed Bahgat" },
+            { shop: "EXP Omranya", manager: "Ahmed Bahgat" },
+            { shop: "EXP Ramsis Sq", manager: "Ahmed Bahgat" },
+            { shop: "Fr Down Town", manager: "Ahmed Bahgat" },
+            { shop: "Fr El Haram", manager: "Ahmed Bahgat" },
+            { shop: "Fr Omrania", manager: "Ahmed Bahgat" },
+            { shop: "OB. Al Mahata", manager: "Ahmed Bahgat" },
+            { shop: "OB. Awseem", manager: "Ahmed Bahgat" },
+            { shop: "OB. Bashteel", manager: "Ahmed Bahgat" },
+            { shop: "OB. El Oroba", manager: "Ahmed Bahgat" },
+            { shop: "OB. Embaba 1", manager: "Ahmed Bahgat" },
+            { shop: "OB. Embaba2", manager: "Ahmed Bahgat" },
+            { shop: "OB. Meit Oukba", manager: "Ahmed Bahgat" },
+            { shop: "OB. Tawfikia Square", manager: "Ahmed Bahgat" },
+            { shop: "EXP Damietta", manager: "Ahmed Elgendy" },
+            { shop: "EXP Manzala", manager: "Ahmed Elgendy" },
+            { shop: "EXP Qasaseen", manager: "Ahmed Elgendy" },
+            { shop: "Fr Port Said Canal", manager: "Ahmed Elgendy" },
+            { shop: "OB. AboKhalifa", manager: "Ahmed Elgendy" },
+            { shop: "OB. PortSaid Belal Ibn Rabah", manager: "Ahmed Elgendy" },
+            { shop: "OB. PortSaid Elrebat", manager: "Ahmed Elgendy" },
+            { shop: "EXP Amria", manager: "Ahmed Moharam" },
+            { shop: "EXP Bahary", manager: "Ahmed Moharam" },
+            { shop: "EXP El Betash", manager: "Ahmed Moharam" },
+            { shop: "EXP El Nakhil", manager: "Ahmed Moharam" },
+            { shop: "EXP Manshya", manager: "Ahmed Moharam" },
+            { shop: "EXP Ras Elteen", manager: "Ahmed Moharam" },
+            { shop: "EXP Saba Banat", manager: "Ahmed Moharam" },
+            { shop: "Fr Agami", manager: "Ahmed Moharam" },
+            { shop: "OB. Matar", manager: "Ahmed Moharam" },
+            { shop: "OB. Tera 1", manager: "Ahmed Moharam" },
+            { shop: "OB. Zahrya", manager: "Ahmed Moharam" },
+            { shop: "EXP Abu Tesht", manager: "Amir Nakhla" },
+            { shop: "EXP El Gouna", manager: "Amir Nakhla" },
+            { shop: "EXP Farshout", manager: "Amir Nakhla" },
+            { shop: "EXP Nagaa Hamady", manager: "Amir Nakhla" },
+            { shop: "EXP Qeft", manager: "Amir Nakhla" },
+            { shop: "EXP Qena Down Town", manager: "Amir Nakhla" },
+            { shop: "EX Qous New", manager: "Amir Nakhla" },
+            { shop: "EXP Saqulta", manager: "Amir Nakhla" },
+            { shop: "EXP Sohag", manager: "Amir Nakhla" },
+            { shop: "Fr Naga Hamady", manager: "Amir Nakhla" },
+            { shop: "Fr Sohag", manager: "Amir Nakhla" },
+            { shop: "OB. Bardis", manager: "Amir Nakhla" },
+            { shop: "OB. Hagaza", manager: "Amir Nakhla" },
+            { shop: "EXP Qena New", manager: "Amir Nakhla" },
+            { shop: "EXP Ismailia3", manager: "Amr Ali" },
+            { shop: "EXP Port Fouad", manager: "Amr Ali" },
+            { shop: "EXP Port Said2", manager: "Amr Ali" },
+            { shop: "EXP PortSaid", manager: "Amr Ali" },
+            { shop: "Fr Ismailia", manager: "Amr Ali" },
+            { shop: "OB. PortSaid El Manakh", manager: "Amr Ali" },
+            { shop: "EXP Ahmed Al Zomor", manager: "Eslam Gouda" },
+            { shop: "EXP El Marg", manager: "Eslam Gouda" },
+            { shop: "EXP MADIENET EL SALAM", manager: "Eslam Gouda" },
+            { shop: "EXP Madinet Elsalam 2", manager: "Eslam Gouda" },
+            { shop: "EXP Nady ElSekka", manager: "Eslam Gouda" },
+            { shop: "EXP Nasr City 10th dist", manager: "Eslam Gouda" },
+            { shop: "Fr El tagamoe EL khames", manager: "Eslam Gouda" },
+            { shop: "OB. 20th St", manager: "Eslam Gouda" },
+            { shop: "OB. Manshiet Elsad Elaaly", manager: "Eslam Gouda" },
+            { shop: "EXP Sadat 3", manager: "Hossam Hafez" },
+            { shop: "EXP Wadi EL Natron", manager: "Hossam Hafez" },
+            { shop: "OB. Khatatba", manager: "Hossam Hafez" },
+            { shop: "OB. Nobria", manager: "Hossam Hafez" },
+            { shop: "EXP El Eshreni", manager: "Ibrahim Mahmoud" },
+            { shop: "EXP El Haram", manager: "Ibrahim Mahmoud" },
+            { shop: "EXP El Lebeny", manager: "Ibrahim Mahmoud" },
+            { shop: "EXP Hadayek ElAhram Gate 4", manager: "Ibrahim Mahmoud" },
+            { shop: "EXP Hadayek ElMohandseen", manager: "Ibrahim Mahmoud" },
+            { shop: "EXP Mesaha Fisal", manager: "Ibrahim Mahmoud" },
+            { shop: "EXP Tersaa", manager: "Ibrahim Mahmoud" },
+            { shop: "Fr 6 October", manager: "Ibrahim Mahmoud" },
+            { shop: "Fr Mazar Mall", manager: "Ibrahim Mahmoud" },
+            { shop: "Fr Shehab", manager: "Ibrahim Mahmoud" },
+            { shop: "OB. Hadayek 6 October", manager: "Ibrahim Mahmoud" },
+            { shop: "OB. Nazlet Batran", manager: "Ibrahim Mahmoud" },
+            { shop: "OB. Selim st", manager: "Ibrahim Mahmoud" },
+            { shop: "OB. Taawon Faisal", manager: "Ibrahim Mahmoud" },
+            { shop: "OB. Tawabek", manager: "Ibrahim Mahmoud" },
+            { shop: "EXP Galaa Tanta", manager: "Maged Magdy" },
+            { shop: "EXP Tanta", manager: "Maged Magdy" },
+            { shop: "Fr Kafr Elzayat", manager: "Maged Magdy" },
+            { shop: "OB. Berma", manager: "Maged Magdy" },
+            { shop: "OB. Ebiar", manager: "Maged Magdy" },
+            { shop: "OB. ElDalgamon New", manager: "Maged Magdy" },
+            { shop: "OB. Kafr Elzayat 2", manager: "Maged Magdy" },
+            { shop: "OB. Kom Hamada", manager: "Maged Magdy" },
+            { shop: "OB. Segar Tanta", manager: "Maged Magdy" },
+            { shop: "OB. Tanta Elmodirya", manager: "Maged Magdy" },
+            { shop: "OB. Al Ayat", manager: "Michael Fayek" },
+            { shop: "Al Agameyin Youth Center", manager: "Michael Fayek" },
+            { shop: "Atfiah Youth Center", manager: "Michael Fayek" },
+            { shop: "El Borombel Youth Center", manager: "Michael Fayek" },
+            { shop: "EXP Ahnsia", manager: "Michael Fayek" },
+            { shop: "EXP Beba", manager: "Michael Fayek" },
+            { shop: "EXP Naser", manager: "Michael Fayek" },
+            { shop: "Fr Central Fayoum", manager: "Michael Fayek" },
+            { shop: "OB. El Saff", manager: "Michael Fayek" },
+            { shop: "OB. Naser Baniswef", manager: "Michael Fayek" },
+            { shop: "EXP Manshayt Naser Mini", manager: "Mohamed Emad" },
+            { shop: "EXP Matarya", manager: "Mohamed Emad" },
+            { shop: "EXP Saker Korish", manager: "Mohamed Emad" },
+            { shop: "EXP Sawah", manager: "Mohamed Emad" },
+            { shop: "EXP Sayeda Zenab", manager: "Mohamed Emad" },
+            { shop: "EXP Zawya El Hamra", manager: "Mohamed Emad" },
+            { shop: "Fr Aghakhan", manager: "Mohamed Emad" },
+            { shop: "Fr Hadayek El Koba", manager: "Mohamed Emad" },
+            { shop: "Fr Mokkattam", manager: "Mohamed Emad" },
+            { shop: "OB. Bassaten2", manager: "Mohamed Emad" },
+            { shop: "OB. El Drasa", manager: "Mohamed Emad" },
+            { shop: "OB. Mokattam2", manager: "Mohamed Emad" },
+            { shop: "EXP Ismailia", manager: "Mostafa Mohamed" },
+            { shop: "EXP Ismailia EL-Fardous", manager: "Mostafa Mohamed" },
+            { shop: "EXP Salheya", manager: "Mohamed Ragab" },
+            { shop: "OB. Ismailia ELHekr", manager: "Omar Elsaid" },
+            { shop: "OB. Ismailia EL-Mostashfa", manager: "Omar Elsaid" },
+            { shop: "EXP Kanater", manager: "Mohamed Mostafa" },
+            { shop: "EXP Nahia", manager: "Mohamed Mostafa" },
+            { shop: "EXP NASRCITY 7TH DISTRICT", manager: "Mohamed Mostafa" },
+            { shop: "EXP Shabory", manager: "Mohamed Mostafa" },
+            { shop: "EXP Shoubra Al Khima", manager: "Mohamed Mostafa" },
+            { shop: "EXP Talbia", manager: "Mohamed Mostafa" },
+            { shop: "Fr Shoubra El Kema", manager: "Mohamed Mostafa" },
+            { shop: "OB. 15May", manager: "Mohamed Mostafa" },
+            { shop: "OB. Bahtem", manager: "Mohamed Mostafa" },
+            { shop: "OB. Marg 5", manager: "Mohamed Mostafa" },
+            { shop: "OB. Bahtem2", manager: "Mohamed Mostafa" },
+            { shop: "OB. Bashteel 2", manager: "Mohamed Mostafa" },
+            { shop: "OB. Basos", manager: "Mohamed Mostafa" },
+            { shop: "OB. El Sayed Hamada", manager: "Mohamed Mostafa" },
+            { shop: "OB. Ezbet El Nakhl 3", manager: "Mohamed Mostafa" },
+            { shop: "OB. Kafr Tohorms", manager: "Mohamed Mostafa" },
+            { shop: "OB. Khanka", manager: "Mohamed Mostafa" },
+            { shop: "OB. Khosos", manager: "Mohamed Mostafa" },
+            { shop: "EXP ElKharga", manager: "Mohamed Sayed" },
+            { shop: "EXP Mostafa Hafez", manager: "Mohamed Sayed" },
+            { shop: "Fr Ahly Club", manager: "Mohamed Sayed" },
+            { shop: "OB. Ain Shams", manager: "Mohamed Sayed" },
+            { shop: "OB. El Hoda", manager: "Mohamed Sayed" },
+            { shop: "OB. Matarya", manager: "Mohamed Sayed" },
+            { shop: "OB. Sefarat", manager: "Mohamed Sayed" },
+            { shop: "EXP Borg El Arab", manager: "Mostafa Adel" },
+            { shop: "EXP Ghobryal", manager: "Mostafa Adel" },
+            { shop: "EXP Ibrahimia", manager: "Mostafa Adel" },
+            { shop: "EXP Nabawy El Mohandess", manager: "Mostafa Adel" },
+            { shop: "EXP Syouf", manager: "Mostafa Adel" },
+            { shop: "Fr Moharam Bek Alex", manager: "Mostafa Adel" },
+            { shop: "OB. Abo Soliman", manager: "Mostafa Adel" },
+            { shop: "EXP Ismailia AboSoeir", manager: "Mostafa Mohamed" },
+            { shop: "EXP Suez", manager: "Mostafa Mohamed" },
+            { shop: "EXP Suez Faisal", manager: "Mostafa Mohamed" },
+            { shop: "EXP Suez Kuwait", manager: "Mostafa Mohamed" },
+            { shop: "EXP Suez2", manager: "Mostafa Mohamed" },
+            { shop: "Fr Suez", manager: "Mostafa Mohamed" },
+            { shop: "OB. Ismailia Abo-Atwa", manager: "Mohamed Ragab" },
+            { shop: "OB. Nefisha", manager: "Mohamed Ragab" },
+            { shop: "OB. Suez ELSalam", manager: "Mostafa Mohamed" },
+            { shop: "OB. Suez Oraby", manager: "Mostafa Mohamed" },
+            { shop: "EXP Ismailia2", manager: "Mostafa Mohamed" },
+            { shop: "Exp Hyper Badr", manager: "Mostafa Mohamed" },
+            { shop: "OB. Ismailia1", manager: "Mostafa Mohamed" },
+            { shop: "EXP Talia", manager: "Mustafa Shaqery" },
+            { shop: "OB. El Mansouria", manager: "Mustafa Shaqery" },
+            { shop: "OB. Nekla", manager: "Mustafa Shaqery" },
+            { shop: "OB. Wardan1", manager: "Mustafa Shaqery" },
+            { shop: "Samadon Youth Center", manager: "Mustafa Shaqery" },
+            { shop: "Shmaa Youth Center", manager: "Mustafa Shaqery" },
+            { shop: "EXP Quantra", manager: "Omar Elsaid" },
+            { shop: "OB. Qantara EL-Moahda", manager: "Omar Elsaid" },
+            { shop: "EXP Abo korkas", manager: "Shady Maher" },
+            { shop: "EXP Assuit", manager: "Shady Maher" },
+            { shop: "EXP Asyut", manager: "Shady Maher" },
+            { shop: "EXP Dayr Mawas", manager: "Shady Maher" },
+            { shop: "EXP Matay", manager: "Shady Maher" },
+            { shop: "EXP New Valley", manager: "Shady Maher" },
+            { shop: "EXP Sahel Selim", manager: "Shady Maher" },
+            { shop: "OB. Abo Korkas New", manager: "Shady Maher" }
+        ];
+
+        async function initAuth() {
+            try {
+                if (!auth.currentUser) {
+                    await signInAnonymously(auth).catch(err => {
+                        console.warn("Auth warning:", err.message);
+                    });
+                }
+            } catch (error) {
+                console.error("Auth initialization error:", error);
+            }
+        }
+
+        onAuthStateChanged(auth, (user) => {
+            if (user && user.email) {
+                const isAdmin = user.email === 'admin@pyramidsexpress.com';
+                window.state.user = { uid: user.uid, email: user.email, name: isAdmin ? 'System Admin' : 'PE Agent' };
+                window.state.isLoggedIn = true;
+                window.state.isAdmin = isAdmin;
+            } else {
+                window.state.user = user ? { uid: user.uid, name: 'Guest' } : null;
+                window.state.isLoggedIn = false;
+                window.state.isAdmin = false;
+            }
+            setupDataSync();
+            render();
+        });
+
+        let materialUnsub, userUnsub, shopUnsub, requestUnsub;
+
+        function setupDataSync() {
+            if (!auth.currentUser) return;
+            
+            if (materialUnsub) materialUnsub();
+            if (userUnsub) userUnsub();
+            if (shopUnsub) shopUnsub();
+            if (requestUnsub) requestUnsub();
+
+            const publicDataRef = collection(db, 'artifacts', appId, 'public', 'data', 'materials');
+            materialUnsub = onSnapshot(publicDataRef, (snapshot) => {
+                const newMaterials = { 'orange-info': [], 'corporate': [], 'incentives': [] };
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    if (newMaterials[data.category]) {
+                        newMaterials[data.category].push({ id: doc.id, ...data });
+                    }
+                });
+                window.state.materials = newMaterials;
+                render();
+            }, (error) => console.error("Materials sync error:", error));
+
+            const usersRef = collection(db, 'artifacts', appId, 'public', 'data', 'users');
+            userUnsub = onSnapshot(usersRef, (snapshot) => {
+                const newUsers = [];
+                snapshot.forEach((doc) => {
+                    newUsers.push({ id: doc.id, ...doc.data() });
+                });
+                window.state.users = newUsers;
+                render();
+            }, (error) => console.error("Users sync error:", error));
+
+            const shopsRef = collection(db, 'artifacts', appId, 'public', 'data', 'shops');
+            shopUnsub = onSnapshot(shopsRef, (snapshot) => {
+                const newShops = [];
+                snapshot.forEach((doc) => {
+                    newShops.push({ id: doc.id, ...doc.data() });
+                });
+                window.state.shops = newShops;
+                updateSignupManagers();
+                render();
+            }, (error) => console.error("Shops sync error:", error));
+
+            const requestsRef = collection(db, 'artifacts', appId, 'public', 'data', 'requests');
+            requestUnsub = onSnapshot(requestsRef, (snapshot) => {
+                const newRequests = [];
+                snapshot.forEach((doc) => {
+                    newRequests.push({ id: doc.id, ...doc.data() });
+                });
+                window.state.requests = newRequests;
+                render();
+            }, (error) => console.error("Requests sync error:", error));
+        }
+
+        window.navigateTo = (page) => {
+            window.state.currentPage = page;
+            render();
+            window.scrollTo(0, 0);
+        };
+
+        window.toggleTheme = () => {
+            window.state.darkMode = !window.state.darkMode;
+            document.documentElement.classList.toggle('dark', window.state.darkMode);
+            render();
+        };
+
+        window.toggleAuthModal = (show) => {
+            const modal = document.getElementById('auth-modal');
+            modal.style.display = show ? 'flex' : 'none';
+            if (show) toggleAuthView('login');
+        };
+
+        window.toggleAuthView = (view) => {
+            const loginView = document.getElementById('auth-view-login');
+            const signupView = document.getElementById('auth-view-signup');
+            if (view === 'signup') {
+                loginView.classList.add('hidden');
+                signupView.classList.remove('hidden');
+                updateSignupManagers();
+            } else {
+                loginView.classList.remove('hidden');
+                signupView.classList.add('hidden');
+            }
+        };
+
+        window.updateSignupManagers = () => {
+            const select = document.getElementById('signup-area');
+            if (!select) return;
+            const source = window.state.shops.length > 0 
+                ? window.state.shops.map(s => s.areaManager)
+                : INITIAL_SHOP_DATA.map(s => s.manager);
+            const managers = [...new Set(source)].sort();
+            select.innerHTML = '<option value="">SELECT AREA MANAGER</option>';
+            managers.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = m.toUpperCase();
+                select.appendChild(opt);
+            });
+        };
+
+        window.updateSignupShops = () => {
+            const manager = document.getElementById('signup-area').value;
+            const shopSelect = document.getElementById('signup-shop');
+            if (!shopSelect) return;
+            shopSelect.innerHTML = '<option value="">SELECT SHOP</option>';
+            if (!manager) {
+                shopSelect.disabled = true;
+                return;
+            }
+            const source = window.state.shops.length > 0 ? window.state.shops : INITIAL_SHOP_DATA;
+            const filteredShops = source
+                .filter(s => (s.areaManager || s.manager) === manager)
+                .map(s => s.shopName || s.shop)
+                .sort();
+            filteredShops.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s;
+                opt.textContent = s.toUpperCase();
+                shopSelect.appendChild(opt);
+            });
+            shopSelect.disabled = false;
+        };
+
+        window.handleLogin = async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('auth-submit-btn');
+            const email = document.getElementById('login-email').value;
+            const pass = document.getElementById('login-pass').value;
+            btn.disabled = true;
+            btn.innerHTML = 'Verifying...';
+            try {
+                await signInWithEmailAndPassword(auth, email, pass);
+                toggleAuthModal(false);
+                navigateTo('admin-panel');
+            } catch (err) {
+                console.error("Login failed:", err);
+                alert("Login Error: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Authorize Session';
+            }
+        };
+
+        window.handleSignUp = async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('signup-submit-btn');
+            const name = document.getElementById('signup-name').value;
+            const email = document.getElementById('signup-email').value;
+            const pass = document.getElementById('signup-pass').value;
+            const area = document.getElementById('signup-area').value;
+            const shop = document.getElementById('signup-shop').value;
+            btn.disabled = true;
+            btn.innerHTML = 'Submitting...';
+            try {
+                const requestId = Date.now().toString();
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', requestId), {
+                    agentName: name, email, password: pass, areaManager: area, shopName: shop,
+                    status: 'pending', createdAt: new Date().toISOString()
+                });
+                alert("Application submitted! Wait for Admin approval.");
+                toggleAuthView('login');
+                e.target.reset();
+            } catch (err) {
+                console.error("Sign up error:", err);
+                alert("Submission failed.");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Submit Application';
+            }
+        };
+
+        window.logout = async () => {
+            try { await signOut(auth); navigateTo('home'); } catch (e) {}
+        };
+
+        // --- Admin Specific Operations ---
+        window.seedShopDatabase = async () => {
+            if (!window.state.isAdmin) return;
+            if (!confirm("Populate Shop database?")) return;
+            const btn = document.getElementById('seed-db-btn');
+            btn.disabled = true;
+            try {
+                for (let i = 0; i < INITIAL_SHOP_DATA.length; i++) {
+                    const item = INITIAL_SHOP_DATA[i];
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shops', "shop_"+i), {
+                        shopName: item.shop,
+                        areaManager: item.manager
+                    });
+                }
+                alert("Database Seeded!");
+            } catch (err) { alert(err.message); }
+            btn.disabled = false;
+        };
+
+        window.handleApproveRequest = async (request) => {
+            try {
+                const userId = Date.now().toString();
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userId), {
+                    email: request.email,
+                    agentName: request.agentName,
+                    areaManager: request.areaManager,
+                    shopName: request.shopName,
+                    approvedAt: new Date().toISOString()
+                });
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', request.id));
+            } catch (err) { alert("Approval failed."); }
+        };
+
+        window.handleRejectRequest = async (id) => {
+            if (confirm("Reject application?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', id));
+        };
+
+        window.handleAdminUpload = async (e) => {
+            e.preventDefault();
+            const cat = document.getElementById('adm-cat').value;
+            const title = document.getElementById('adm-title').value;
+            const type = document.querySelector('input[name="adm-type"]:checked').value;
+            
+            if (!window.selectedFileData) {
+                alert("Error: No file selected. Please choose a file first.");
+                return;
+            }
+
+            const btn = e.target.querySelector('button[type="submit"]');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = "Processing Upload...";
+
+            try {
+                const id = Date.now().toString();
+                const materialRef = doc(db, 'artifacts', appId, 'public', 'data', 'materials', id);
+                
+                await setDoc(materialRef, { 
+                    category: cat, 
+                    title: title, 
+                    type: type, 
+                    url: window.selectedFileData, 
+                    createdAt: new Date().toISOString() 
+                });
+                
+                e.target.reset();
+                window.selectedFileData = null;
+                alert("Resource posted successfully!");
+            } catch (err) { 
+                console.error("Upload Error:", err);
+                if (err.message.includes("quota") || err.message.includes("large")) {
+                    alert("Upload failed: The file is too large. Firestore documents have a 1MB limit.");
+                } else {
+                    alert("Upload failed: " + err.message);
+                }
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        };
+
+        window.handleFileSelect = (input) => {
+            const file = input.files[0];
+            const statusText = document.getElementById('file-status-text');
+            if (!file) return;
+
+            // Safe limit for Base64 strings in Firestore is ~750KB because encoding adds 33%
+            if (file.size > 750 * 1024) {
+                alert("File is too large! Due to Base64 encoding, please use files under 750KB to stay within the 1MB Firestore limit.");
+                input.value = '';
+                statusText.textContent = "Select File (< 750KB)";
+                return;
+            }
+
+            statusText.textContent = "Loading file...";
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                window.selectedFileData = e.target.result;
+                statusText.textContent = "File Ready: " + file.name;
+            };
+            reader.onerror = () => {
+                alert("Error reading file.");
+                statusText.textContent = "Select File (< 750KB)";
+            };
+            reader.readAsDataURL(file);
+        };
+
+        window.handleDeleteUserAccess = async (id) => {
+            if (confirm("Remove access?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', id));
+        };
+
+        window.handleDeleteShopEntry = async (id) => {
+            if (confirm("Delete entry?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shops', id));
+        };
+
+        window.handleDeleteMaterial = async (id) => {
+            if (confirm("Delete this resource permanently?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'materials', id));
+        };
+
+        // Viewer logic
+        window.openViewer = (material) => {
+            const viewer = document.getElementById('media-viewer');
+            const body = document.getElementById('viewer-body');
+            const title = document.getElementById('viewer-title');
+            
+            title.textContent = material.title;
+            body.innerHTML = '<div class="p-10 text-xs font-bold animate-pulse">Loading content...</div>';
+
+            setTimeout(() => {
+                body.innerHTML = '';
+                if (material.type === 'photo') {
+                    body.innerHTML = `<img src="${material.url}" class="max-w-full max-h-full object-contain">`;
+                } else if (material.type === 'video') {
+                    body.innerHTML = `<video src="${material.url}" controls class="max-w-full max-h-full" autoplay></video>`;
+                } else if (material.type === 'pdf') {
+                    body.innerHTML = `<iframe src="${material.url}" class="pdf-embed"></iframe>`;
+                }
+            }, 100);
+
+            viewer.style.display = 'flex';
+            lucide.createIcons();
+        };
+
+        window.closeViewer = () => {
+            const viewer = document.getElementById('media-viewer');
+            const body = document.getElementById('viewer-body');
+            body.innerHTML = ''; // Clear source
+            viewer.style.display = 'none';
+        };
+
+        function render() {
+            const root = document.getElementById('app-root');
+            const navLinks = document.getElementById('nav-links');
+            if (!root) return;
+            const s = window.state;
+            
+            let navHtml = `<button onclick="navigateTo('home')" class="text-xs uppercase font-bold tracking-widest opacity-60 hover:text-red-600 transition-colors">Home</button>`;
+            if (s.isLoggedIn) {
+                if (s.isAdmin) {
+                    const badge = s.requests.length > 0 ? `<span class="ml-1.5 w-4 h-4 rounded-full bg-red-600 text-white text-[8px] flex items-center justify-center animate-pulse">${s.requests.length}</span>` : '';
+                    navHtml += `<button onclick="navigateTo('agent-dashboard')" class="text-xs uppercase font-bold tracking-widest hover:text-red-600 transition-colors">Dashboard</button>`;
+                    navHtml += `<button onclick="navigateTo('admin-panel')" class="text-xs uppercase font-bold tracking-widest text-red-600 flex items-center"><i data-lucide="settings" class="w-3.5 h-3.5 mr-1"></i> Management${badge}</button>`;
+                } else {
+                    navHtml += `<button onclick="navigateTo('agent-dashboard')" class="text-xs uppercase font-bold tracking-widest hover:text-red-600 transition-colors">Dashboard</button>`;
+                }
+                navHtml += `<div class="flex items-center space-x-4 border-l border-gray-200 dark:border-gray-800 pl-6"><span class="text-xs font-bold opacity-60">${s.user.name}</span><button onclick="logout()" class="text-red-600 hover:opacity-70 transition-opacity"><i data-lucide="log-out" class="w-4 h-4"></i></button></div>`;
+            } else {
+                navHtml += `<button onclick="toggleAuthModal(true)" class="px-4 py-1.5 rounded text-xs font-bold uppercase tracking-widest ${s.darkMode ? 'bg-red-600 text-white' : 'bg-black text-white'} transition-colors">Agent Login</button>`;
+            }
+            navLinks.innerHTML = navHtml;
+
+            if (s.currentPage === 'home') root.innerHTML = renderHome();
+            else if (s.currentPage === 'agent-dashboard') root.innerHTML = renderDashboard();
+            else if (s.currentPage === 'admin-panel') root.innerHTML = renderAdmin();
+            else if (s.currentPage === 'service-medical') root.innerHTML = renderMedicalPortal();
+            else if (s.currentPage.startsWith('service-')) root.innerHTML = renderServiceDetail(s.currentPage.replace('service-', ''));
+
+            lucide.createIcons();
+        }
+
+        function renderHome() {
+            const gradient = window.state.darkMode ? 'from-black to-red-900' : 'from-black to-orange-600';
+            return `<div class="fade-in"><section class="relative h-[450px] w-full mt-0 overflow-hidden flex items-center justify-center"><div class="absolute inset-0 z-0"><img src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=2000" class="w-full h-full object-cover brightness-[0.4]" alt="Team"><div class="absolute inset-0 opacity-40 bg-gradient-to-r ${gradient}"></div></div><div class="relative z-10 text-center px-4"><div class="mb-4 inline-block bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-1 rounded text-[10px] font-bold uppercase tracking-[0.2em] text-white">Partner Orange Egypt</div><h1 class="text-5xl md:text-7xl font-black text-white uppercase tracking-tighter leading-none mb-4">One <span class="text-red-600">Team</span> One <span class="text-red-600">Goal</span></h1><p class="text-white text-lg md:text-xl font-light tracking-wide uppercase opacity-90">Reliability & Excellence</p><button onclick="toggleAuthModal(true)" class="mt-8 bg-red-600 text-white px-8 py-3 rounded font-bold uppercase text-xs tracking-widest hover:bg-red-700 transition-all shadow-2xl">Portal Access</button></div></section></div>`;
+        }
+
+        function renderDashboard() {
+            const services = [
+                { id: 'medical', title: 'Medical Insurance', sub: 'Omega Care Network', icon: 'heart-pulse', type: 'page' },
+                { id: 'orange-info', title: 'Orange Info', sub: 'Sales & Tariffs', icon: 'globe', type: 'page' },
+                { id: 'corporate', title: 'Corporate Materials', sub: 'Solutions', icon: 'briefcase', type: 'page' },
+                { id: 'incentives', title: 'Incentives', sub: 'Rewards', icon: 'award', type: 'page' }
+            ];
+            return `<div class="max-w-7xl mx-auto px-4 py-12 fade-in">
+                <div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8 flex justify-between items-end">
+                    <div>
+                        <h2 class="text-3xl font-black uppercase tracking-tight mb-2 text-gray-900 dark:text-white">Agent Dashboard</h2>
+                        <p class="text-gray-500 text-sm uppercase tracking-widest">Authorized Access Only</p>
+                    </div>
+                    ${window.state.isAdmin ? `<button onclick="navigateTo('admin-panel')" class="text-[10px] font-black uppercase tracking-[0.2em] text-red-600 border border-red-600 px-4 py-2 rounded-xl hover:bg-red-600 hover:text-white transition-all">Go to Management</button>` : ''}
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    ${services.map(s => `
+                        <div onclick="navigateTo('service-${s.id}')" class="group p-8 rounded-2xl border transition-all cursor-pointer ${window.state.darkMode ? 'bg-gray-900 border-gray-800 hover:border-red-600' : 'bg-white border-gray-100 hover:border-black shadow-sm hover:shadow-xl'}">
+                            <div class="w-14 h-14 rounded-xl flex items-center justify-center mb-6 transition-colors ${window.state.darkMode ? 'bg-red-600/10 text-red-600' : 'bg-black/5 text-black group-hover:bg-red-600 group-hover:text-white'}">
+                                <i data-lucide="${s.icon}" class="w-8 h-8"></i>
+                            </div>
+                            <h3 class="font-black uppercase text-lg tracking-tight mb-1">${s.title}</h3>
+                            <p class="text-red-600 text-xs font-bold uppercase tracking-widest mb-6">${s.sub}</p>
+                            <div class="flex items-center text-xs font-bold uppercase tracking-widest group-hover:translate-x-2 transition-transform">
+                                View Portal <i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i>
+                            </div>
+                        </div>`).join('')}
+                </div>
+            </div>`;
+        }
+
+        function renderMedicalPortal() {
+            return `<div class="max-w-7xl mx-auto px-4 py-12 fade-in">
+                <button onclick="navigateTo('agent-dashboard')" class="flex items-center text-xs font-bold uppercase tracking-widest text-red-600 mb-8 hover:opacity-70">
+                    <i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i> Back to Dashboard
+                </button>
+                <div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8">
+                    <h1 class="text-4xl font-black uppercase tracking-tighter text-gray-900 dark:text-white">Medical <span class="text-red-600">Insurance</span></h1>
+                    <p class="text-gray-500 text-xs uppercase font-bold tracking-widest mt-2">Omega Care Reporting System</p>
+                </div>
+                
+                <div class="iframe-container shadow-2xl border border-gray-100 dark:border-gray-800">
+                    <iframe src="https://lookerstudio.google.com/embed/reporting/01d55067-0527-435e-9e17-5a692003f0b0/page/N7h0D" allowfullscreen sandbox="allow-storage-access-by-user-activation allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+                </div>
+
+                <div class="mt-12 p-8 rounded-3xl bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
+                    <h3 class="text-sm font-black uppercase tracking-widest mb-4 dark:text-white">Quick Help</h3>
+                    <p class="text-xs opacity-60 leading-relaxed dark:text-gray-400">If the report fails to load, please ensure you are logged into your corporate Google account. For medical emergencies, contact the hotlines provided in the Omega Care manual.</p>
+                </div>
+            </div>`;
+        }
+
+        function renderAdmin() {
+            const users = window.state.users;
+            const shops = window.state.shops;
+            const requests = window.state.requests;
+            const allMaterials = Object.values(window.state.materials).flat();
+
+            return `<div class="max-w-7xl mx-auto px-4 py-12 fade-in">
+                <div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8 flex justify-between items-end">
+                    <div>
+                        <h2 class="text-4xl font-black uppercase tracking-tight mb-2 text-gray-900 dark:text-white">Management</h2>
+                        <p class="text-red-600 text-xs font-bold uppercase tracking-widest">Administrator Hub</p>
+                    </div>
+                    <button onclick="navigateTo('agent-dashboard')" class="text-[10px] font-black uppercase tracking-[0.2em] text-black border border-black px-4 py-2 rounded-xl hover:bg-black hover:text-white dark:border-white dark:text-white dark:hover:bg-white dark:hover:text-black transition-all">Access Agent View</button>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                    <div class="lg:col-span-1 space-y-6">
+                         <!-- QUICK ACTIONS -->
+                         <div class="p-6 rounded-2xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
+                            <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white">Database Control</h3>
+                            <button id="seed-db-btn" onclick="seedShopDatabase()" class="w-full bg-red-600 text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg mb-4">Initialize Shop Data</button>
+                            <div class="text-[9px] opacity-40 uppercase font-bold tracking-widest">Project ID: pyramids-express-52a27</div>
+                         </div>
+
+                         <!-- UPLOAD MATERIAL -->
+                         <div class="p-6 rounded-2xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
+                            <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white">Direct File Upload</h3>
+                            <form onsubmit="handleAdminUpload(event)" class="space-y-3">
+                                <select id="adm-cat" class="w-full p-2.5 rounded-xl border text-[10px] font-bold uppercase ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
+                                    <option value="orange-info">Orange Info</option>
+                                    <option value="corporate">Corporate</option>
+                                    <option value="incentives">Incentives</option>
+                                </select>
+                                <input id="adm-title" required placeholder="Resource Title" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
+                                
+                                <div class="relative w-full">
+                                    <input type="file" id="adm-file" onchange="handleFileSelect(this)" class="hidden" accept="image/*,video/*,application/pdf">
+                                    <label for="adm-file" class="w-full flex items-center justify-center p-4 border-2 border-dashed rounded-xl cursor-pointer hover:border-red-600 transition-colors ${window.state.darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'}">
+                                        <div class="text-center">
+                                            <i data-lucide="file-up" class="w-6 h-6 mx-auto mb-2 opacity-40"></i>
+                                            <span id="file-status-text" class="text-[9px] font-black uppercase tracking-widest opacity-60">Select File (< 750KB)</span>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                <div class="flex justify-between p-2">
+                                    <label class="text-[9px] dark:text-white flex items-center"><input type="radio" name="adm-type" value="photo" checked class="mr-1"> Photo</label>
+                                    <label class="text-[9px] dark:text-white flex items-center"><input type="radio" name="adm-type" value="video" class="mr-1"> Video</label>
+                                    <label class="text-[9px] dark:text-white flex items-center"><input type="radio" name="adm-type" value="pdf" class="mr-1"> PDF</label>
+                                </div>
+                                <button type="submit" class="w-full bg-black text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest dark:bg-red-600">Post Material</button>
+                            </form>
+                         </div>
+                    </div>
+
+                    <div class="lg:col-span-3 space-y-8">
+                        <!-- PENDING REQUESTS -->
+                        ${requests.length > 0 ? `
+                        <div class="p-6 rounded-3xl border-2 border-red-600 ${window.state.darkMode ? 'bg-red-950/10' : 'bg-red-50'} animate-fade-in">
+                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 flex justify-between dark:text-white text-red-600">Pending Agent Approvals <span class="bg-red-600 text-white px-2 rounded-full">${requests.length}</span></h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                ${requests.map(req => `
+                                    <div class="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-red-100 shadow-sm">
+                                        <div class="flex justify-between items-start mb-3">
+                                            <div>
+                                                <p class="text-xs font-black uppercase dark:text-white">${req.agentName}</p>
+                                                <p class="text-[10px] font-medium opacity-60 dark:text-gray-400">${req.email}</p>
+                                            </div>
+                                            <div class="flex space-x-2">
+                                                <button onclick='handleApproveRequest(${JSON.stringify(req).replace(/'/g, "&apos;")})' class="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-600 hover:text-white transition-all"><i data-lucide="check" class="w-4 h-4"></i></button>
+                                                <button onclick="handleRejectRequest('${req.id}')" class="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all"><i data-lucide="x" class="w-4 h-4"></i></button>
+                                            </div>
+                                        </div>
+                                        <div class="text-[9px] opacity-60 font-bold uppercase flex justify-between">
+                                            <span><i data-lucide="map-pin" class="w-3 h-3 inline mr-1"></i>${req.shopName}</span>
+                                            <span><i data-lucide="shield" class="w-3 h-3 inline mr-1"></i>${req.areaManager}</span>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        <!-- MANAGE RESOURCES -->
+                        <div class="p-6 rounded-3xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
+                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 dark:text-white">Active Resources</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                ${allMaterials.map(m => `
+                                    <div class="p-4 rounded-xl bg-gray-50 dark:bg-gray-800 flex justify-between items-center group">
+                                        <div class="overflow-hidden">
+                                            <p class="text-[10px] font-black uppercase dark:text-white truncate">${m.title}</p>
+                                            <p class="text-[8px] opacity-40 uppercase">${m.category}</p>
+                                        </div>
+                                        <div class="flex space-x-2">
+                                            <button onclick='openViewer(${JSON.stringify(m).replace(/'/g, "&apos;")})' class="text-gray-400 hover:text-black dark:hover:text-white transition-colors"><i data-lucide="eye" class="w-4 h-4"></i></button>
+                                            <button onclick="handleDeleteMaterial('${m.id}')" class="text-gray-400 hover:text-red-600 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                                ${allMaterials.length === 0 ? '<p class="text-[10px] opacity-40 uppercase italic col-span-3">No resources found.</p>' : ''}
+                            </div>
+                        </div>
+
+                        <!-- AGENT LIST -->
+                        <div class="p-6 rounded-3xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
+                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-4 flex justify-between dark:text-white">Authorized Agents <span class="text-red-600">${users.length} Users</span></h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                ${users.map(u => `
+                                    <div class="p-4 rounded-xl bg-gray-50 dark:bg-gray-800 flex justify-between items-center">
+                                        <div>
+                                            <p class="text-[10px] font-black uppercase dark:text-white">${u.agentName}</p>
+                                            <p class="text-[9px] opacity-40 dark:text-gray-400">${u.email}</p>
+                                        </div>
+                                        <button onclick="handleDeleteUserAccess('${u.id}')" class="text-gray-400 hover:text-red-600"><i data-lucide="user-x" class="w-4 h-4"></i></button>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function renderServiceDetail(catId) {
+            const items = window.state.materials[catId] || [];
+            return `<div class="max-w-4xl mx-auto px-4 py-12 fade-in">
+                <button onclick="navigateTo('agent-dashboard')" class="flex items-center text-xs font-bold uppercase tracking-widest text-red-600 mb-8 hover:opacity-70">
+                    <i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i> Back to Dashboard
+                </button>
+                <h1 class="text-4xl font-black uppercase tracking-tighter mb-12 text-gray-900 dark:text-white">${catId.replace('-', ' ')} <span class="text-red-600">Materials</span></h1>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    ${items.map(i => `
+                        <div onclick='openViewer(${JSON.stringify(i).replace(/'/g, "&apos;")})' class="p-6 rounded-xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800 hover:bg-gray-800' : 'bg-white border-gray-100 hover:shadow-lg'} transition-all flex justify-between items-center group cursor-pointer">
+                            <div>
+                                <p class="text-xs font-bold uppercase tracking-widest mb-1 dark:text-white">${i.title}</p>
+                                <p class="text-[9px] font-medium opacity-40 uppercase tracking-tighter dark:text-gray-500">Preview Data</p>
+                            </div>
+                            <div class="text-red-600 group-hover:scale-110 transition-transform">
+                                <i data-lucide="${i.type === 'pdf' ? 'file-text' : i.type === 'video' ? 'video' : 'image'}" class="w-5 h-5"></i>
+                            </div>
+                        </div>`).join('')}
+                    ${items.length === 0 ? '<div class="col-span-2 py-20 text-center opacity-30 uppercase font-black text-xs tracking-widest">No materials uploaded yet.</div>' : ''}
+                </div>
+            </div>`;
+        }
+
+        window.onload = () => {
+            document.getElementById('year').textContent = new Date().getFullYear();
+            initAuth();
+            render();
+            lucide.createIcons();
+            document.getElementById('login-form').addEventListener('submit', window.handleLogin);
+            document.getElementById('signup-form').addEventListener('submit', window.handleSignUp);
+        };
+    </script>
+</body>
+</html>
