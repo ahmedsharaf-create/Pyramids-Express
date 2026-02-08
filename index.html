@@ -20,8 +20,15 @@
         .iframe-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
         
         /* Viewer styles */
-        .media-viewer-content { max-height: 80vh; max-width: 90vw; }
+        .media-viewer-content { max-height: 80vh; max-width: 90vw; overflow: auto; }
         .pdf-embed { width: 100%; height: 70vh; border-radius: 0.5rem; }
+        
+        /* Original size for Incentives */
+        .original-size { 
+            max-width: none !important; 
+            max-height: none !important; 
+            object-fit: none !important;
+        }
     </style>
 </head>
 <body class="bg-white text-gray-900 overflow-x-hidden transition-colors duration-300">
@@ -60,10 +67,10 @@
                 <span class="text-[10px] font-bold uppercase tracking-widest">Close Preview</span>
                 <i data-lucide="x" class="w-6 h-6"></i>
             </button>
-            <div id="viewer-body" class="media-viewer-content w-full bg-white dark:bg-gray-900 rounded-3xl overflow-hidden shadow-2xl flex items-center justify-center">
+            <div id="viewer-body" class="media-viewer-content w-full bg-white dark:bg-gray-900 rounded-3xl overflow-hidden shadow-2xl flex items-center justify-center custom-scrollbar">
                 <!-- Content injected here -->
             </div>
-            <div id="viewer-title" class="mt-4 text-white font-black uppercase tracking-widest text-sm"></div>
+            <div id="viewer-title" class="mt-4 text-white font-black uppercase tracking-widest text-sm text-center"></div>
         </div>
     </div>
 
@@ -483,25 +490,37 @@
         };
 
         window.updateSignupManagers = () => {
-            const select = document.getElementById('signup-area');
+            const select = document.getElementById('signup-area') || document.getElementById('adm-create-area');
             if (!select) return;
             const source = window.state.shops.length > 0 
                 ? window.state.shops.map(s => s.areaManager)
                 : INITIAL_SHOP_DATA.map(s => s.manager);
             const managers = [...new Set(source)].sort();
-            select.innerHTML = '<option value="">SELECT AREA MANAGER</option>';
-            managers.forEach(m => {
-                const opt = document.createElement('option');
-                opt.value = m;
-                opt.textContent = m.toUpperCase();
-                select.appendChild(opt);
+            
+            // Handle both selects if present
+            const selects = ['signup-area', 'adm-create-area'];
+            selects.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.innerHTML = `<option value="">SELECT AREA MANAGER</option>`;
+                managers.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m;
+                    opt.textContent = m.toUpperCase();
+                    el.appendChild(opt);
+                });
             });
         };
 
         window.updateSignupShops = () => {
-            const manager = document.getElementById('signup-area').value;
-            const shopSelect = document.getElementById('signup-shop');
+            const isSignup = document.activeElement.id === 'signup-area';
+            const managerId = isSignup ? 'signup-area' : 'adm-create-area';
+            const shopId = isSignup ? 'signup-shop' : 'adm-create-shop';
+            
+            const manager = document.getElementById(managerId).value;
+            const shopSelect = document.getElementById(shopId);
             if (!shopSelect) return;
+            
             shopSelect.innerHTML = '<option value="">SELECT SHOP</option>';
             if (!manager) {
                 shopSelect.disabled = true;
@@ -541,6 +560,24 @@
             }
         };
 
+        // Simulated Email Notification
+        async function notifyAdminOfSignup(requestData) {
+            const adminEmail = "ahmedsharaf.pe@gmail.com";
+            console.log(`[SIMULATED EMAIL SENT TO ${adminEmail}]`);
+            console.log(`Subject: New Agent Application - ${requestData.agentName}`);
+            console.log(`Content: Name: ${requestData.agentName}, Email: ${requestData.email}, Shop: ${requestData.shopName}, Area: ${requestData.areaManager}`);
+            
+            // Optionally log to a 'notifications' collection for admin to view
+            try {
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notifications', Date.now().toString()), {
+                    to: adminEmail,
+                    type: 'signup_request',
+                    data: requestData,
+                    timestamp: new Date().toISOString()
+                });
+            } catch (e) {}
+        }
+
         window.handleSignUp = async (e) => {
             e.preventDefault();
             const btn = document.getElementById('signup-submit-btn');
@@ -553,11 +590,17 @@
             btn.innerHTML = 'Submitting...';
             try {
                 const requestId = Date.now().toString();
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', requestId), {
+                const reqObj = {
+                    id: requestId,
                     agentName: name, email, password: pass, areaManager: area, shopName: shop,
                     status: 'pending', createdAt: new Date().toISOString()
-                });
-                alert("Application submitted! Wait for Admin approval.");
+                };
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', requestId), reqObj);
+                
+                // Trigger simulated email notification
+                await notifyAdminOfSignup(reqObj);
+                
+                alert("Application submitted! Wait for Admin approval. A notification has been sent to ahmedsharaf.pe@gmail.com");
                 toggleAuthView('login');
                 e.target.reset();
             } catch (err) {
@@ -574,6 +617,39 @@
         };
 
         // --- Admin Specific Operations ---
+        window.handleAdminCreateUser = async (e) => {
+            e.preventDefault();
+            const btn = e.target.querySelector('button');
+            const name = document.getElementById('adm-create-name').value;
+            const email = document.getElementById('adm-create-email').value;
+            const pass = document.getElementById('adm-create-pass').value;
+            const area = document.getElementById('adm-create-area').value;
+            const shop = document.getElementById('adm-create-shop').value;
+            
+            btn.disabled = true;
+            btn.innerHTML = "Creating...";
+
+            try {
+                const userId = Date.now().toString();
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userId), {
+                    email,
+                    password: pass, // Record for reference
+                    agentName: name,
+                    areaManager: area,
+                    shopName: shop,
+                    approvedAt: new Date().toISOString(),
+                    createdBy: 'Admin'
+                });
+                alert("Agent account created successfully!");
+                e.target.reset();
+            } catch (err) {
+                alert("Failed to create account.");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = "Create Agent Account";
+            }
+        };
+
         window.seedShopDatabase = async () => {
             if (!window.state.isAdmin) return;
             if (!confirm("Populate Shop database?")) return;
@@ -659,7 +735,6 @@
             const statusText = document.getElementById('file-status-text');
             if (!file) return;
 
-            // Safe limit for Base64 strings in Firestore is ~750KB because encoding adds 33%
             if (file.size > 750 * 1024) {
                 alert("File is too large! Due to Base64 encoding, please use files under 750KB to stay within the 1MB Firestore limit.");
                 input.value = '';
@@ -684,10 +759,6 @@
             if (confirm("Remove access?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', id));
         };
 
-        window.handleDeleteShopEntry = async (id) => {
-            if (confirm("Delete entry?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shops', id));
-        };
-
         window.handleDeleteMaterial = async (id) => {
             if (confirm("Delete this resource permanently?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'materials', id));
         };
@@ -704,7 +775,9 @@
             setTimeout(() => {
                 body.innerHTML = '';
                 if (material.type === 'photo') {
-                    body.innerHTML = `<img src="${material.url}" class="max-w-full max-h-full object-contain">`;
+                    // Check if category is 'incentives' to apply original size
+                    const isOriginal = material.category === 'incentives' ? 'original-size' : 'max-w-full max-h-full object-contain';
+                    body.innerHTML = `<img src="${material.url}" class="${isOriginal}">`;
                 } else if (material.type === 'video') {
                     body.innerHTML = `<video src="${material.url}" controls class="max-w-full max-h-full" autoplay></video>`;
                 } else if (material.type === 'pdf') {
@@ -719,7 +792,7 @@
         window.closeViewer = () => {
             const viewer = document.getElementById('media-viewer');
             const body = document.getElementById('viewer-body');
-            body.innerHTML = ''; // Clear source
+            body.innerHTML = '';
             viewer.style.display = 'none';
         };
 
@@ -798,21 +871,14 @@
                     <h1 class="text-4xl font-black uppercase tracking-tighter text-gray-900 dark:text-white">Medical <span class="text-red-600">Insurance</span></h1>
                     <p class="text-gray-500 text-xs uppercase font-bold tracking-widest mt-2">Omega Care Reporting System</p>
                 </div>
-                
                 <div class="iframe-container shadow-2xl border border-gray-100 dark:border-gray-800">
                     <iframe src="https://lookerstudio.google.com/embed/reporting/01d55067-0527-435e-9e17-5a692003f0b0/page/N7h0D" allowfullscreen sandbox="allow-storage-access-by-user-activation allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
-                </div>
-
-                <div class="mt-12 p-8 rounded-3xl bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
-                    <h3 class="text-sm font-black uppercase tracking-widest mb-4 dark:text-white">Quick Help</h3>
-                    <p class="text-xs opacity-60 leading-relaxed dark:text-gray-400">If the report fails to load, please ensure you are logged into your corporate Google account. For medical emergencies, contact the hotlines provided in the Omega Care manual.</p>
                 </div>
             </div>`;
         }
 
         function renderAdmin() {
             const users = window.state.users;
-            const shops = window.state.shops;
             const requests = window.state.requests;
             const allMaterials = Object.values(window.state.materials).flat();
 
@@ -822,21 +888,19 @@
                         <h2 class="text-4xl font-black uppercase tracking-tight mb-2 text-gray-900 dark:text-white">Management</h2>
                         <p class="text-red-600 text-xs font-bold uppercase tracking-widest">Administrator Hub</p>
                     </div>
-                    <button onclick="navigateTo('agent-dashboard')" class="text-[10px] font-black uppercase tracking-[0.2em] text-black border border-black px-4 py-2 rounded-xl hover:bg-black hover:text-white dark:border-white dark:text-white dark:hover:bg-white dark:hover:text-black transition-all">Access Agent View</button>
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
                     <div class="lg:col-span-1 space-y-6">
-                         <!-- QUICK ACTIONS -->
+                         <!-- DATABASE SEED -->
                          <div class="p-6 rounded-2xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                            <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white">Database Control</h3>
-                            <button id="seed-db-btn" onclick="seedShopDatabase()" class="w-full bg-red-600 text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg mb-4">Initialize Shop Data</button>
-                            <div class="text-[9px] opacity-40 uppercase font-bold tracking-widest">Project ID: pyramids-express-52a27</div>
+                            <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white">Quick Actions</h3>
+                            <button id="seed-db-btn" onclick="seedShopDatabase()" class="w-full bg-black text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-widest dark:bg-gray-800 mb-4">Sync Shop Database</button>
                          </div>
 
-                         <!-- UPLOAD MATERIAL -->
+                         <!-- UPLOAD -->
                          <div class="p-6 rounded-2xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                            <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white">Direct File Upload</h3>
+                            <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white text-red-600">Post Material</h3>
                             <form onsubmit="handleAdminUpload(event)" class="space-y-3">
                                 <select id="adm-cat" class="w-full p-2.5 rounded-xl border text-[10px] font-bold uppercase ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
                                     <option value="orange-info">Orange Info</option>
@@ -850,52 +914,65 @@
                                     <label for="adm-file" class="w-full flex items-center justify-center p-4 border-2 border-dashed rounded-xl cursor-pointer hover:border-red-600 transition-colors ${window.state.darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'}">
                                         <div class="text-center">
                                             <i data-lucide="file-up" class="w-6 h-6 mx-auto mb-2 opacity-40"></i>
-                                            <span id="file-status-text" class="text-[9px] font-black uppercase tracking-widest opacity-60">Select File (< 750KB)</span>
+                                            <span id="file-status-text" class="text-[9px] font-black uppercase tracking-widest opacity-60 dark:text-gray-400">Select File (< 750KB)</span>
                                         </div>
                                     </label>
                                 </div>
-
                                 <div class="flex justify-between p-2">
                                     <label class="text-[9px] dark:text-white flex items-center"><input type="radio" name="adm-type" value="photo" checked class="mr-1"> Photo</label>
                                     <label class="text-[9px] dark:text-white flex items-center"><input type="radio" name="adm-type" value="video" class="mr-1"> Video</label>
                                     <label class="text-[9px] dark:text-white flex items-center"><input type="radio" name="adm-type" value="pdf" class="mr-1"> PDF</label>
                                 </div>
-                                <button type="submit" class="w-full bg-black text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest dark:bg-red-600">Post Material</button>
+                                <button type="submit" class="w-full bg-red-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest">Publish Material</button>
+                            </form>
+                         </div>
+
+                         <!-- CREATE AGENT ACCOUNT -->
+                         <div class="p-6 rounded-2xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
+                            <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white text-blue-600">Create Agent Account</h3>
+                            <form onsubmit="handleAdminCreateUser(event)" class="space-y-3">
+                                <input id="adm-create-name" required placeholder="Full Name" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
+                                <input id="adm-create-email" required type="email" placeholder="Email Address" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
+                                <input id="adm-create-pass" required type="text" placeholder="Set Password" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
+                                
+                                <select id="adm-create-area" onchange="updateSignupShops()" class="w-full p-2.5 rounded-xl border text-[10px] font-bold uppercase dark:bg-gray-800 dark:border-gray-700 dark:text-white">
+                                    <option value="">SELECT AREA</option>
+                                </select>
+                                <select id="adm-create-shop" class="w-full p-2.5 rounded-xl border text-[10px] font-bold uppercase dark:bg-gray-800 dark:border-gray-700 dark:text-white" disabled>
+                                    <option value="">SELECT SHOP</option>
+                                </select>
+                                <button type="submit" class="w-full bg-blue-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700">Create Agent Account</button>
                             </form>
                          </div>
                     </div>
 
                     <div class="lg:col-span-3 space-y-8">
-                        <!-- PENDING REQUESTS -->
+                        <!-- PENDING -->
                         ${requests.length > 0 ? `
-                        <div class="p-6 rounded-3xl border-2 border-red-600 ${window.state.darkMode ? 'bg-red-950/10' : 'bg-red-50'} animate-fade-in">
-                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 flex justify-between dark:text-white text-red-600">Pending Agent Approvals <span class="bg-red-600 text-white px-2 rounded-full">${requests.length}</span></h4>
+                        <div class="p-6 rounded-3xl border-2 border-red-600 ${window.state.darkMode ? 'bg-red-950/10' : 'bg-red-50'}">
+                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 flex justify-between text-red-600">Applications for ahmedsharaf.pe@gmail.com <span class="bg-red-600 text-white px-2 rounded-full">${requests.length}</span></h4>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 ${requests.map(req => `
                                     <div class="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-red-100 shadow-sm">
-                                        <div class="flex justify-between items-start mb-3">
+                                        <div class="flex justify-between items-start">
                                             <div>
                                                 <p class="text-xs font-black uppercase dark:text-white">${req.agentName}</p>
-                                                <p class="text-[10px] font-medium opacity-60 dark:text-gray-400">${req.email}</p>
+                                                <p class="text-[10px] font-medium opacity-60 dark:text-gray-400 mb-2">${req.email}</p>
+                                                <div class="text-[8px] font-black uppercase tracking-widest text-red-600">${req.shopName} | ${req.areaManager}</div>
                                             </div>
                                             <div class="flex space-x-2">
                                                 <button onclick='handleApproveRequest(${JSON.stringify(req).replace(/'/g, "&apos;")})' class="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-600 hover:text-white transition-all"><i data-lucide="check" class="w-4 h-4"></i></button>
                                                 <button onclick="handleRejectRequest('${req.id}')" class="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all"><i data-lucide="x" class="w-4 h-4"></i></button>
                                             </div>
                                         </div>
-                                        <div class="text-[9px] opacity-60 font-bold uppercase flex justify-between">
-                                            <span><i data-lucide="map-pin" class="w-3 h-3 inline mr-1"></i>${req.shopName}</span>
-                                            <span><i data-lucide="shield" class="w-3 h-3 inline mr-1"></i>${req.areaManager}</span>
-                                        </div>
                                     </div>
                                 `).join('')}
                             </div>
-                        </div>
-                        ` : ''}
+                        </div>` : ''}
 
-                        <!-- MANAGE RESOURCES -->
+                        <!-- RESOURCES -->
                         <div class="p-6 rounded-3xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 dark:text-white">Active Resources</h4>
+                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 dark:text-white">Active Resources Library</h4>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 ${allMaterials.map(m => `
                                     <div class="p-4 rounded-xl bg-gray-50 dark:bg-gray-800 flex justify-between items-center group">
@@ -907,25 +984,22 @@
                                             <button onclick='openViewer(${JSON.stringify(m).replace(/'/g, "&apos;")})' class="text-gray-400 hover:text-black dark:hover:text-white transition-colors"><i data-lucide="eye" class="w-4 h-4"></i></button>
                                             <button onclick="handleDeleteMaterial('${m.id}')" class="text-gray-400 hover:text-red-600 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                                         </div>
-                                    </div>
-                                `).join('')}
-                                ${allMaterials.length === 0 ? '<p class="text-[10px] opacity-40 uppercase italic col-span-3">No resources found.</p>' : ''}
+                                    </div>`).join('')}
                             </div>
                         </div>
 
-                        <!-- AGENT LIST -->
+                        <!-- AUTHORIZED AGENTS -->
                         <div class="p-6 rounded-3xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-4 flex justify-between dark:text-white">Authorized Agents <span class="text-red-600">${users.length} Users</span></h4>
+                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white">Active Agent Directory <span class="text-red-600">${users.length} Authorized</span></h4>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 ${users.map(u => `
                                     <div class="p-4 rounded-xl bg-gray-50 dark:bg-gray-800 flex justify-between items-center">
                                         <div>
                                             <p class="text-[10px] font-black uppercase dark:text-white">${u.agentName}</p>
-                                            <p class="text-[9px] opacity-40 dark:text-gray-400">${u.email}</p>
+                                            <p class="text-[9px] opacity-40 dark:text-gray-400">${u.email} | ${u.shopName}</p>
                                         </div>
                                         <button onclick="handleDeleteUserAccess('${u.id}')" class="text-gray-400 hover:text-red-600"><i data-lucide="user-x" class="w-4 h-4"></i></button>
-                                    </div>
-                                `).join('')}
+                                    </div>`).join('')}
                             </div>
                         </div>
                     </div>
@@ -939,7 +1013,7 @@
                 <button onclick="navigateTo('agent-dashboard')" class="flex items-center text-xs font-bold uppercase tracking-widest text-red-600 mb-8 hover:opacity-70">
                     <i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i> Back to Dashboard
                 </button>
-                <h1 class="text-4xl font-black uppercase tracking-tighter mb-12 text-gray-900 dark:text-white">${catId.replace('-', ' ')} <span class="text-red-600">Materials</span></h1>
+                <h1 class="text-4xl font-black uppercase tracking-tighter mb-12 dark:text-white">${catId.replace('-', ' ')} <span class="text-red-600">Portal</span></h1>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     ${items.map(i => `
                         <div onclick='openViewer(${JSON.stringify(i).replace(/'/g, "&apos;")})' class="p-6 rounded-xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800 hover:bg-gray-800' : 'bg-white border-gray-100 hover:shadow-lg'} transition-all flex justify-between items-center group cursor-pointer">
