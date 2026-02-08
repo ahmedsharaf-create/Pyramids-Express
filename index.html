@@ -18,6 +18,10 @@
         [v-cloak] { display: none; }
         .iframe-container { position: relative; width: 100%; padding-bottom: 75%; height: 0; overflow: hidden; border-radius: 1.5rem; }
         .iframe-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+        
+        /* Viewer styles */
+        .media-viewer-content { max-height: 80vh; max-width: 90vw; }
+        .pdf-embed { width: 100%; height: 70vh; border-radius: 0.5rem; }
     </style>
 </head>
 <body class="bg-white text-gray-900 overflow-x-hidden transition-colors duration-300">
@@ -48,6 +52,21 @@
 
     <!-- --- Main Content Area --- -->
     <div id="app-root" class="min-h-screen pt-16"></div>
+
+    <!-- --- Media Viewer Modal --- -->
+    <div id="media-viewer" class="fixed inset-0 z-[150] hidden items-center justify-center px-4">
+        <div class="absolute inset-0 bg-black/95 backdrop-blur-md" onclick="closeViewer()"></div>
+        <div class="relative w-full max-w-5xl flex flex-col items-center">
+            <button onclick="closeViewer()" class="absolute -top-12 right-0 text-white flex items-center space-x-2 opacity-70 hover:opacity-100 transition-opacity">
+                <span class="text-[10px] font-bold uppercase tracking-widest">Close Preview</span>
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+            <div id="viewer-body" class="media-viewer-content w-full bg-white dark:bg-gray-900 rounded-3xl overflow-hidden shadow-2xl flex items-center justify-center">
+                <!-- Content injected here -->
+            </div>
+            <div id="viewer-title" class="mt-4 text-white font-black uppercase tracking-widest text-sm"></div>
+        </div>
+    </div>
 
     <!-- --- Footer --- -->
     <footer id="main-footer" class="py-12 mt-20 border-t border-gray-100 bg-gray-50 transition-colors duration-300">
@@ -153,6 +172,8 @@
             shops: [],
             requests: [] 
         };
+
+        window.selectedFileData = null;
 
         const INITIAL_SHOP_DATA = [
             { shop: "EXP El Eskandrany", manager: "Abdallah Ibrahim" },
@@ -604,20 +625,52 @@
             e.preventDefault();
             const cat = document.getElementById('adm-cat').value;
             const title = document.getElementById('adm-title').value;
-            const url = document.getElementById('adm-url').value;
             const type = document.querySelector('input[name="adm-type"]:checked').value;
-            const id = Date.now().toString();
+            
+            if (!window.selectedFileData) {
+                alert("Please select a file to upload.");
+                return;
+            }
+
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true;
+            btn.innerHTML = "Uploading Data...";
+
             try {
+                const id = Date.now().toString();
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'materials', id), { 
                     category: cat, 
                     title, 
                     type, 
-                    url: url || '#', 
+                    url: window.selectedFileData, 
                     createdAt: new Date().toISOString() 
                 });
                 e.target.reset();
+                window.selectedFileData = null;
                 alert("Resource posted successfully!");
-            } catch (err) { alert("Upload failed: " + err.message); }
+            } catch (err) { 
+                alert("Upload failed. Ensure the file is small (under 1MB)."); 
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = "Post Material";
+            }
+        };
+
+        window.handleFileSelect = (input) => {
+            const file = input.files[0];
+            if (!file) return;
+
+            if (file.size > 1024 * 1024) {
+                alert("File too large! Must be under 1MB for direct upload.");
+                input.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                window.selectedFileData = e.target.result;
+            };
+            reader.readAsDataURL(file);
         };
 
         window.handleDeleteUserAccess = async (id) => {
@@ -630,6 +683,34 @@
 
         window.handleDeleteMaterial = async (id) => {
             if (confirm("Delete this resource permanently?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'materials', id));
+        };
+
+        // Viewer logic
+        window.openViewer = (material) => {
+            const viewer = document.getElementById('media-viewer');
+            const body = document.getElementById('viewer-body');
+            const title = document.getElementById('viewer-title');
+            
+            title.textContent = material.title;
+            body.innerHTML = '';
+
+            if (material.type === 'photo') {
+                body.innerHTML = `<img src="${material.url}" class="max-w-full max-h-full object-contain">`;
+            } else if (material.type === 'video') {
+                body.innerHTML = `<video src="${material.url}" controls class="max-w-full max-h-full" autoplay></video>`;
+            } else if (material.type === 'pdf') {
+                body.innerHTML = `<iframe src="${material.url}" class="pdf-embed"></iframe>`;
+            }
+
+            viewer.style.display = 'flex';
+            lucide.createIcons();
+        };
+
+        window.closeViewer = () => {
+            const viewer = document.getElementById('media-viewer');
+            const body = document.getElementById('viewer-body');
+            body.innerHTML = ''; // Clear source to stop videos/iframes
+            viewer.style.display = 'none';
         };
 
         function render() {
@@ -745,7 +826,7 @@
 
                          <!-- UPLOAD MATERIAL -->
                          <div class="p-6 rounded-2xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                            <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white">Upload Resource</h3>
+                            <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white">Direct File Upload</h3>
                             <form onsubmit="handleAdminUpload(event)" class="space-y-3">
                                 <select id="adm-cat" class="w-full p-2.5 rounded-xl border text-[10px] font-bold uppercase ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
                                     <option value="orange-info">Orange Info</option>
@@ -753,7 +834,17 @@
                                     <option value="incentives">Incentives</option>
                                 </select>
                                 <input id="adm-title" required placeholder="Resource Title" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
-                                <input id="adm-url" required placeholder="File URL (Google Drive/Direct Link)" class="w-full p-2.5 rounded-xl border text-[10px] font-bold ${window.state.darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-200'}">
+                                
+                                <div class="relative w-full">
+                                    <input type="file" id="adm-file" onchange="handleFileSelect(this)" class="hidden" accept="image/*,video/*,application/pdf">
+                                    <label for="adm-file" class="w-full flex items-center justify-center p-4 border-2 border-dashed rounded-xl cursor-pointer hover:border-red-600 transition-colors ${window.state.darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'}">
+                                        <div class="text-center">
+                                            <i data-lucide="file-up" class="w-6 h-6 mx-auto mb-2 opacity-40"></i>
+                                            <span class="text-[9px] font-black uppercase tracking-widest opacity-60">Select File (< 1MB)</span>
+                                        </div>
+                                    </label>
+                                </div>
+
                                 <div class="flex justify-between p-2">
                                     <label class="text-[9px] dark:text-white flex items-center"><input type="radio" name="adm-type" value="photo" checked class="mr-1"> Photo</label>
                                     <label class="text-[9px] dark:text-white flex items-center"><input type="radio" name="adm-type" value="video" class="mr-1"> Video</label>
@@ -802,7 +893,10 @@
                                             <p class="text-[10px] font-black uppercase dark:text-white truncate">${m.title}</p>
                                             <p class="text-[8px] opacity-40 uppercase">${m.category}</p>
                                         </div>
-                                        <button onclick="handleDeleteMaterial('${m.id}')" class="text-gray-400 hover:text-red-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                        <div class="flex space-x-2">
+                                            <button onclick='openViewer(${JSON.stringify(m)})' class="text-gray-400 hover:text-black dark:hover:text-white"><i data-lucide="eye" class="w-4 h-4"></i></button>
+                                            <button onclick="handleDeleteMaterial('${m.id}')" class="text-gray-400 hover:text-red-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                        </div>
                                     </div>
                                 `).join('')}
                                 ${allMaterials.length === 0 ? '<p class="text-[10px] opacity-40 uppercase italic col-span-3">No resources found.</p>' : ''}
@@ -853,10 +947,10 @@
                 <h1 class="text-4xl font-black uppercase tracking-tighter mb-12 text-gray-900 dark:text-white">${catId.replace('-', ' ')} <span class="text-red-600">Materials</span></h1>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     ${items.map(i => `
-                        <div onclick="window.open('${i.url}', '_blank')" class="p-6 rounded-xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800 hover:bg-gray-800' : 'bg-white border-gray-100 hover:shadow-lg'} transition-all flex justify-between items-center group cursor-pointer">
+                        <div onclick='openViewer(${JSON.stringify(i)})' class="p-6 rounded-xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800 hover:bg-gray-800' : 'bg-white border-gray-100 hover:shadow-lg'} transition-all flex justify-between items-center group cursor-pointer">
                             <div>
                                 <p class="text-xs font-bold uppercase tracking-widest mb-1 dark:text-white">${i.title}</p>
-                                <p class="text-[9px] font-medium opacity-40 uppercase tracking-tighter dark:text-gray-500">Resource Link</p>
+                                <p class="text-[9px] font-medium opacity-40 uppercase tracking-tighter dark:text-gray-500">Preview Data</p>
                             </div>
                             <div class="text-red-600 group-hover:scale-110 transition-transform">
                                 <i data-lucide="${i.type === 'pdf' ? 'file-text' : i.type === 'video' ? 'video' : 'image'}" class="w-5 h-5"></i>
