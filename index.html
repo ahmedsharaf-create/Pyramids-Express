@@ -580,6 +580,24 @@
             }
         };
 
+        async function notifyAdminOfSignup(requestData) {
+            const adminEmail = "ahmedsharaf.pe@gmail.com";
+            try {
+                const notifId = Date.now().toString();
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notifications', notifId), {
+                    to: adminEmail,
+                    type: 'signup_request',
+                    agentName: requestData.agentName,
+                    agentEmail: requestData.email,
+                    shopName: requestData.shopName,
+                    areaManager: requestData.areaManager,
+                    timestamp: new Date().toISOString()
+                });
+            } catch (e) {
+                console.error("Notification failed", e);
+            }
+        }
+
         window.handleSignUp = async (e) => {
             e.preventDefault();
             const btn = document.getElementById('signup-submit-btn');
@@ -590,55 +608,42 @@
             const shop = document.getElementById('signup-shop').value;
             
             btn.disabled = true;
-            btn.innerHTML = 'Submitting...';
+            btn.innerHTML = 'Establishing Session...';
             
             try {
-                if (!auth.currentUser) await signInAnonymously(auth);
+                if (!auth.currentUser) {
+                    await signInAnonymously(auth);
+                }
+                
                 const requestId = Date.now().toString();
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', requestId), {
-                    id: requestId, agentName: name, email, password: pass, areaManager: area, shopName: shop,
-                    status: 'pending', createdAt: new Date().toISOString()
-                });
+                const reqObj = {
+                    id: requestId,
+                    agentName: name, 
+                    email: email, 
+                    password: pass, 
+                    areaManager: area, 
+                    shopName: shop,
+                    status: 'pending', 
+                    createdAt: new Date().toISOString()
+                };
+
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', requestId), reqObj);
+                await notifyAdminOfSignup(reqObj);
+
                 alert("Application submitted! Wait for Admin approval.");
                 toggleAuthView('login');
                 e.target.reset();
             } catch (err) {
-                alert("Submission failed.");
+                console.error("Sign up error:", err);
+                alert("Submission failed. Error: " + err.message);
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = 'Submit Application';
             }
         };
 
-        window.handleAdminAddShop = async (e) => {
-            e.preventDefault();
-            const manager = document.getElementById('adm-shop-manager').value;
-            const shopName = document.getElementById('adm-shop-name').value;
-            const btn = e.target.querySelector('button');
-            
-            btn.disabled = true;
-            btn.innerHTML = "Adding...";
-            try {
-                const shopId = Date.now().toString();
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shops', shopId), {
-                    id: shopId,
-                    areaManager: manager,
-                    shopName: shopName
-                });
-                alert("Shop added to registry!");
-                e.target.reset();
-            } catch (err) {
-                alert("Failed to add shop.");
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = "Add Shop to Registry";
-            }
-        };
-
-        window.handleDeleteShop = async (id) => {
-            if (confirm("Permanently remove this shop? agents associated with it will stay but new ones won't see it.")) {
-                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shops', id));
-            }
+        window.logout = async () => {
+            try { await signOut(auth); navigateTo('home'); } catch (e) {}
         };
 
         window.handleAdminCreateUser = async (e) => {
@@ -650,20 +655,34 @@
             const area = document.getElementById('adm-create-area').value;
             const shop = document.getElementById('adm-create-shop').value;
             
-            if (!area || !shop) { alert("Select Manager and Shop"); return; }
+            if (!area || !shop) {
+                alert("Please select Area Manager and Shop");
+                return;
+            }
+
             btn.disabled = true;
             btn.innerHTML = "Creating...";
 
             try {
                 const userId = Date.now().toString();
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userId), {
-                    email, password: pass, agentName: name, areaManager: area, shopName: shop,
-                    approvedAt: new Date().toISOString(), createdBy: 'Admin'
+                    email,
+                    password: pass,
+                    agentName: name,
+                    areaManager: area,
+                    shopName: shop,
+                    approvedAt: new Date().toISOString(),
+                    createdBy: 'Admin'
                 });
-                alert("Agent account created!");
+                alert("Agent account created successfully!");
                 e.target.reset();
-            } catch (err) { alert("Failed to create account."); }
-            finally { btn.disabled = false; btn.innerHTML = "Create Agent Account"; }
+                document.getElementById('adm-create-shop').disabled = true;
+            } catch (err) {
+                alert("Failed to create account. Error: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = "Create Agent Account";
+            }
         };
 
         window.applyAdminFilters = () => {
@@ -684,10 +703,15 @@
             try {
                 const userId = Date.now().toString();
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userId), {
-                    email: request.email, password: request.password, agentName: request.agentName,
-                    areaManager: request.areaManager, shopName: request.shopName, approvedAt: new Date().toISOString()
+                    email: request.email,
+                    password: request.password || "reset-needed",
+                    agentName: request.agentName,
+                    areaManager: request.areaManager,
+                    shopName: request.shopName,
+                    approvedAt: new Date().toISOString()
                 });
                 await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', request.id));
+                alert("User approved and added to database.");
             } catch (err) { alert("Approval failed."); }
         };
 
@@ -697,57 +721,98 @@
 
         window.handleAdminUpload = async (e) => {
             e.preventDefault();
-            if (!window.selectedFileData) { alert("No file selected."); return; }
+            const cat = document.getElementById('adm-cat').value;
+            const title = document.getElementById('adm-title').value;
+            const type = document.querySelector('input[name="adm-type"]:checked').value;
+            
+            if (!window.selectedFileData) {
+                alert("Error: No file selected.");
+                return;
+            }
+
             const btn = e.target.querySelector('button[type="submit"]');
             btn.disabled = true;
             btn.innerHTML = "Publishing...";
+
             try {
                 const id = Date.now().toString();
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'materials', id), { 
-                    category: document.getElementById('adm-cat').value, 
-                    title: document.getElementById('adm-title').value, 
-                    type: document.querySelector('input[name="adm-type"]:checked').value, 
-                    url: window.selectedFileData, createdAt: new Date().toISOString() 
+                const materialRef = doc(db, 'artifacts', appId, 'public', 'data', 'materials', id);
+                await setDoc(materialRef, { 
+                    category: cat, 
+                    title: title, 
+                    type: type, 
+                    url: window.selectedFileData, 
+                    createdAt: new Date().toISOString() 
                 });
                 e.target.reset();
                 window.selectedFileData = null;
-                alert("Resource posted!");
-            } catch (err) { alert("Upload failed."); }
-            finally { btn.disabled = false; btn.innerHTML = "Publish Resource"; }
+                alert("Resource posted successfully!");
+            } catch (err) { 
+                alert("Upload failed: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = "Publish Material";
+            }
         };
 
         window.handleFileSelect = (input) => {
             const file = input.files[0];
             const statusText = document.getElementById('file-status-text');
             if (!file) return;
-            if (file.size > 750 * 1024) { alert("Max 750KB."); input.value = ''; return; }
-            statusText.textContent = "Loading...";
+
+            if (file.size > 750 * 1024) {
+                alert("File is too large! Max 750KB.");
+                input.value = '';
+                statusText.textContent = "Select File (< 750KB)";
+                return;
+            }
+
+            statusText.textContent = "Loading file...";
             const reader = new FileReader();
-            reader.onload = (e) => { window.selectedFileData = e.target.result; statusText.textContent = "Ready: " + file.name; };
+            reader.onload = (e) => {
+                window.selectedFileData = e.target.result;
+                statusText.textContent = "File Ready: " + file.name;
+            };
             reader.readAsDataURL(file);
         };
 
         window.handleDeleteUserAccess = async (id) => {
-            if (confirm("Remove access?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', id));
+            if (confirm("Remove access permanently?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', id));
         };
 
         window.handleDeleteMaterial = async (id) => {
-            if (confirm("Delete resource?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'materials', id));
+            if (confirm("Delete this resource permanently?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'materials', id));
         };
 
         window.openViewer = (material) => {
             const viewer = document.getElementById('media-viewer');
             const body = document.getElementById('viewer-body');
-            document.getElementById('viewer-title').textContent = material.title;
-            body.innerHTML = '';
-            if (material.type === 'photo') body.innerHTML = `<img src="${material.url}" class="a4-photo-view">`;
-            else if (material.type === 'video') body.innerHTML = `<video src="${material.url}" controls class="max-w-full max-h-[70vh] m-8" autoplay></video>`;
-            else if (material.type === 'pdf') body.innerHTML = `<iframe src="${material.url}" class="pdf-embed"></iframe>`;
+            const title = document.getElementById('viewer-title');
+            
+            title.textContent = material.title;
+            body.innerHTML = '<div class="p-10 text-xs font-bold animate-pulse text-gray-400">Loading...</div>';
+
+            setTimeout(() => {
+                body.innerHTML = '';
+                if (material.type === 'photo') {
+                    body.innerHTML = `<img src="${material.url}" class="a4-photo-view">`;
+                } else if (material.type === 'video') {
+                    body.innerHTML = `<video src="${material.url}" controls class="max-w-full max-h-[70vh] m-8" autoplay></video>`;
+                } else if (material.type === 'pdf') {
+                    body.innerHTML = `<iframe src="${material.url}" class="pdf-embed"></iframe>`;
+                }
+            }, 100);
+
             viewer.style.display = 'flex';
             lucide.createIcons();
         };
 
-        window.closeViewer = () => { document.getElementById('media-viewer').style.display = 'none'; };
+        window.closeViewer = () => {
+            const viewer = document.getElementById('media-viewer');
+            const body = document.getElementById('viewer-body');
+            body.innerHTML = '';
+            viewer.style.display = 'none';
+        };
 
         function render() {
             const root = document.getElementById('app-root');
@@ -761,190 +826,268 @@
                     const badge = s.requests.length > 0 ? `<span class="ml-1.5 w-4 h-4 rounded-full bg-red-600 text-white text-[8px] flex items-center justify-center animate-pulse">${s.requests.length}</span>` : '';
                     navHtml += `<button onclick="navigateTo('agent-dashboard')" class="text-xs uppercase font-bold tracking-widest hover:text-red-600 transition-colors">Dashboard</button>`;
                     navHtml += `<button onclick="navigateTo('admin-panel')" class="text-xs uppercase font-bold tracking-widest text-red-600 flex items-center"><i data-lucide="settings" class="w-3.5 h-3.5 mr-1"></i> Management${badge}</button>`;
-                } else { navHtml += `<button onclick="navigateTo('agent-dashboard')" class="text-xs uppercase font-bold tracking-widest hover:text-red-600 transition-colors">Dashboard</button>`; }
+                } else {
+                    navHtml += `<button onclick="navigateTo('agent-dashboard')" class="text-xs uppercase font-bold tracking-widest hover:text-red-600 transition-colors">Dashboard</button>`;
+                }
                 navHtml += `<div class="flex items-center space-x-4 border-l border-gray-200 dark:border-gray-800 pl-6"><span class="text-xs font-bold opacity-60 dark:text-gray-400">${s.user.name}</span><button onclick="logout()" class="text-red-600 hover:opacity-70 transition-opacity"><i data-lucide="log-out" class="w-4 h-4"></i></button></div>`;
-            } else { navHtml += `<button onclick="toggleAuthModal(true)" class="px-4 py-1.5 rounded text-xs font-bold uppercase tracking-widest ${s.darkMode ? 'bg-red-600 text-white' : 'bg-black text-white'} transition-colors">Agent Login</button>`; }
+            } else {
+                navHtml += `<button onclick="toggleAuthModal(true)" class="px-4 py-1.5 rounded text-xs font-bold uppercase tracking-widest ${s.darkMode ? 'bg-red-600 text-white' : 'bg-black text-white'} transition-colors">Agent Login</button>`;
+            }
             navLinks.innerHTML = navHtml;
 
             if (s.currentPage === 'home') root.innerHTML = renderHome();
             else if (s.currentPage === 'agent-dashboard') root.innerHTML = renderDashboard();
             else if (s.currentPage === 'admin-panel') root.innerHTML = renderAdmin();
             else if (s.currentPage.startsWith('service-')) root.innerHTML = renderServiceDetail(s.currentPage.replace('service-', ''));
+
             lucide.createIcons();
+            
+            // Re-sync dropdowns if on admin page
+            if (s.currentPage === 'admin-panel') {
+                updateSignupManagers();
+            }
         }
 
         function renderHome() {
             const gradient = window.state.darkMode ? 'from-black to-red-900' : 'from-black to-orange-600';
-            return `<div class="fade-in"><section class="relative h-[550px] w-full mt-0 overflow-hidden flex items-center justify-center"><div class="absolute inset-0 z-0"><img src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=2000" class="w-full h-full object-cover brightness-[0.4]" alt="Team"><div class="absolute inset-0 opacity-40 bg-gradient-to-r ${gradient}"></div></div><div class="relative z-10 text-center px-4"><div class="mb-4 inline-block bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-1 rounded text-[10px] font-bold uppercase tracking-[0.2em] text-white">Partner Orange Egypt</div><h1 class="text-5xl md:text-7xl font-black text-white uppercase tracking-tighter leading-none mb-4">One <span class="text-red-600">Team</span> One <span class="text-red-600">Goal</span></h1><p class="text-white text-lg md:text-xl font-light tracking-wide uppercase opacity-90 mb-10">Reliability & Excellence</p><div class="flex flex-wrap justify-center gap-4"><button onclick="navigateTo('service-heroes')" class="bg-white text-black px-8 py-3 rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-2xl flex items-center"><i data-lucide="award" class="w-4 h-4 mr-2"></i> Pyramids Heroes</button><button onclick="navigateTo('service-events')" class="bg-white text-black px-8 py-3 rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-2xl flex items-center"><i data-lucide="camera" class="w-4 h-4 mr-2"></i> Pyramids Events</button>${!window.state.isLoggedIn ? `<button onclick="toggleAuthModal(true)" class="bg-red-600 text-white px-8 py-3 rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-red-700 transition-all shadow-2xl">Agent Portal</button>` : ''}</div></div></section></div>`;
+            return `<div class="fade-in">
+                <section class="relative h-[550px] w-full mt-0 overflow-hidden flex items-center justify-center">
+                    <div class="absolute inset-0 z-0">
+                        <img src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=2000" class="w-full h-full object-cover brightness-[0.4]" alt="Team">
+                        <div class="absolute inset-0 opacity-40 bg-gradient-to-r ${gradient}"></div>
+                    </div>
+                    <div class="relative z-10 text-center px-4">
+                        <div class="mb-4 inline-block bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-1 rounded text-[10px] font-bold uppercase tracking-[0.2em] text-white">Partner Orange Egypt</div>
+                        <h1 class="text-5xl md:text-7xl font-black text-white uppercase tracking-tighter leading-none mb-4">One <span class="text-red-600">Team</span> One <span class="text-red-600">Goal</span></h1>
+                        <p class="text-white text-lg md:text-xl font-light tracking-wide uppercase opacity-90 mb-10">Reliability & Excellence</p>
+                        
+                        <div class="flex flex-wrap justify-center gap-4">
+                            <button onclick="navigateTo('service-heroes')" class="bg-white text-black px-8 py-3 rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-2xl flex items-center">
+                                <i data-lucide="award" class="w-4 h-4 mr-2"></i> Pyramids Heroes
+                            </button>
+                            <button onclick="navigateTo('service-events')" class="bg-white text-black px-8 py-3 rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-2xl flex items-center">
+                                <i data-lucide="camera" class="w-4 h-4 mr-2"></i> Pyramids Events
+                            </button>
+                            ${!window.state.isLoggedIn ? `<button onclick="toggleAuthModal(true)" class="bg-red-600 text-white px-8 py-3 rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-red-700 transition-all shadow-2xl">Agent Portal</button>` : ''}
+                        </div>
+                    </div>
+                </section>
+            </div>`;
         }
 
         function renderDashboard() {
-            const s = [
+            const services = [
                 { id: 'medical', title: 'Medical Insurance', sub: 'Omega Care Network', icon: 'heart-pulse' },
                 { id: 'orange-info', title: 'Orange Info', sub: 'Sales & Tariffs', icon: 'globe' },
                 { id: 'corporate', title: 'Corporate Materials', sub: 'Solutions', icon: 'briefcase' },
                 { id: 'incentives', title: 'Incentives', sub: 'Rewards', icon: 'award' }
             ];
-            return `<div class="max-w-7xl mx-auto px-4 py-12 fade-in"><div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8"><h2 class="text-3xl font-black uppercase tracking-tight mb-2 dark:text-white">Agent Dashboard</h2><p class="text-gray-500 text-sm uppercase tracking-widest">Authorized Access Only</p></div><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">${s.map(x => `<div onclick="navigateTo('service-${x.id}')" class="group p-8 rounded-2xl border transition-all cursor-pointer ${window.state.darkMode ? 'bg-gray-900 border-gray-800 hover:border-red-600' : 'bg-white border-gray-100 hover:border-black shadow-sm hover:shadow-xl'}"><div class="w-14 h-14 rounded-xl flex items-center justify-center mb-6 transition-colors ${window.state.darkMode ? 'bg-red-600/10 text-red-600' : 'bg-black/5 text-black group-hover:bg-red-600 group-hover:text-white'}"><i data-lucide="${x.icon}" class="w-8 h-8"></i></div><h3 class="font-black uppercase text-lg tracking-tight mb-1 dark:text-white">${x.title}</h3><p class="text-red-600 text-xs font-bold uppercase tracking-widest mb-6">${x.sub}</p><div class="flex items-center text-xs font-bold uppercase tracking-widest group-hover:translate-x-2 transition-transform dark:text-gray-400">View Portal <i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i></div></div>`).join('')}</div></div>`;
+            return `<div class="max-w-7xl mx-auto px-4 py-12 fade-in">
+                <div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8 flex justify-between items-end">
+                    <div>
+                        <h2 class="text-3xl font-black uppercase tracking-tight mb-2 text-gray-900 dark:text-white">Agent Dashboard</h2>
+                        <p class="text-gray-500 text-sm uppercase tracking-widest">Authorized Access Only</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    ${services.map(s => `
+                        <div onclick="navigateTo('service-${s.id}')" class="group p-8 rounded-2xl border transition-all cursor-pointer ${window.state.darkMode ? 'bg-gray-900 border-gray-800 hover:border-red-600' : 'bg-white border-gray-100 hover:border-black shadow-sm hover:shadow-xl'}">
+                            <div class="w-14 h-14 rounded-xl flex items-center justify-center mb-6 transition-colors ${window.state.darkMode ? 'bg-red-600/10 text-red-600' : 'bg-black/5 text-black group-hover:bg-red-600 group-hover:text-white'}">
+                                <i data-lucide="${s.icon}" class="w-8 h-8"></i>
+                            </div>
+                            <h3 class="font-black uppercase text-lg tracking-tight mb-1 dark:text-white">${s.title}</h3>
+                            <p class="text-red-600 text-xs font-bold uppercase tracking-widest mb-6">${s.sub}</p>
+                            <div class="flex items-center text-xs font-bold uppercase tracking-widest group-hover:translate-x-2 transition-transform dark:text-gray-400">
+                                View Portal <i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i>
+                            </div>
+                        </div>`).join('')}
+                </div>
+            </div>`;
         }
 
         function renderAdmin() {
             const s = window.state;
+            const requests = s.requests;
+            const allMaterials = Object.values(s.materials).flat();
+
+            // Filter users based on state filters
             const filteredUsers = s.users.filter(u => {
-                const matchesSearch = !s.adminFilters.search || u.agentName.toLowerCase().includes(s.adminFilters.search) || u.email.toLowerCase().includes(s.adminFilters.search);
+                const matchesSearch = !s.adminFilters.search || 
+                    u.agentName.toLowerCase().includes(s.adminFilters.search) || 
+                    u.email.toLowerCase().includes(s.adminFilters.search);
                 const matchesArea = !s.adminFilters.area || u.areaManager === s.adminFilters.area;
                 const matchesShop = !s.adminFilters.shop || u.shopName === s.adminFilters.shop;
                 return matchesSearch && matchesArea && matchesShop;
             });
-            const managerStats = filteredUsers.reduce((acc, u) => { acc[u.areaManager] = (acc[u.areaManager] || 0) + 1; return acc; }, {});
-            const shopStats = filteredUsers.reduce((acc, u) => { acc[u.shopName] = (acc[u.shopName] || 0) + 1; return acc; }, {});
+
+            // Calculate Analytics based on FILTERED users
+            const managerStats = filteredUsers.reduce((acc, u) => {
+                acc[u.areaManager] = (acc[u.areaManager] || 0) + 1;
+                return acc;
+            }, {});
+            const shopStats = filteredUsers.reduce((acc, u) => {
+                acc[u.shopName] = (acc[u.shopName] || 0) + 1;
+                return acc;
+            }, {});
 
             return `<div class="max-w-7xl mx-auto px-4 py-12 fade-in">
-                <div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8 flex flex-col md:flex-row justify-between md:items-end">
+                <div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8 flex justify-between items-end">
                     <div>
-                        <h2 class="text-4xl font-black uppercase tracking-tight mb-2 dark:text-white">Management</h2>
+                        <h2 class="text-4xl font-black uppercase tracking-tight mb-2 text-gray-900 dark:text-white">Management</h2>
                         <p class="text-red-600 text-xs font-bold uppercase tracking-widest">Administrator Hub</p>
-                    </div>
-                    <div class="mt-4 md:mt-0 flex gap-4">
-                        <div class="text-center px-6 py-2 border rounded-2xl bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
-                            <p class="text-[9px] font-black uppercase opacity-40">Agents</p>
-                            <p class="text-xl font-black text-red-600">${s.users.length}</p>
-                        </div>
-                        <div class="text-center px-6 py-2 border rounded-2xl bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
-                            <p class="text-[9px] font-black uppercase opacity-40">Locations</p>
-                            <p class="text-xl font-black text-orange-600">${s.shops.length}</p>
-                        </div>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
                     <div class="lg:col-span-1 space-y-6">
-                         <!-- Registry Management -->
+                         <!-- Resource Upload -->
                          <div class="p-6 rounded-2xl border ${s.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                            <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white text-orange-600 flex items-center">
-                                <i data-lucide="map" class="w-3.5 h-3.5 mr-2"></i> Shop & Manager Registry
-                            </h3>
-                            <form onsubmit="handleAdminAddShop(event)" class="space-y-3">
-                                <input id="adm-shop-manager" required placeholder="Area Manager Name" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:border-orange-600 outline-none transition-all">
-                                <input id="adm-shop-name" required placeholder="Shop Name (e.g. EXP Amria)" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:border-orange-600 outline-none transition-all">
-                                <button type="submit" class="w-full bg-orange-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-700 transition-colors shadow-lg shadow-orange-600/20">Add Shop to Registry</button>
-                            </form>
-                            <div class="mt-6 space-y-2">
-                                <p class="text-[8px] font-black uppercase opacity-40 mb-2 border-b border-gray-100 dark:border-gray-800 pb-1">Live Shop Table (${s.shops.length})</p>
-                                <div class="max-h-[250px] overflow-y-auto custom-scrollbar space-y-1.5 pr-1">
-                                    ${s.shops.map(shop => `
-                                        <div class="flex justify-between items-center p-2.5 bg-gray-50 dark:bg-gray-800 rounded-xl group border border-transparent hover:border-orange-100 dark:hover:border-orange-900 transition-all">
-                                            <div class="overflow-hidden">
-                                                <p class="text-[9px] font-black uppercase truncate dark:text-white leading-none mb-1">${shop.shopName}</p>
-                                                <p class="text-[8px] opacity-40 truncate font-bold uppercase">${shop.areaManager}</p>
-                                            </div>
-                                            <button onclick="handleDeleteShop('${shop.id}')" class="text-gray-400 hover:text-red-600 transition-colors">
-                                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                                            </button>
-                                        </div>
-                                    `).join('')}
-                                    ${s.shops.length === 0 ? '<p class="text-center py-4 text-[9px] font-black opacity-20 uppercase tracking-widest">Registry Empty</p>' : ''}
-                                </div>
-                            </div>
-                         </div>
-
-                         <!-- File Upload -->
-                         <div class="p-6 rounded-2xl border ${s.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                            <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white flex items-center"><i data-lucide="file-up" class="w-3.5 h-3.5 mr-2"></i> Content Manager</h3>
+                            <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white">Direct File Upload</h3>
                             <form onsubmit="handleAdminUpload(event)" class="space-y-3">
-                                <select id="adm-cat" class="w-full p-2.5 rounded-xl border text-[10px] font-bold uppercase dark:bg-gray-800 dark:border-gray-700 dark:text-white"><option value="orange-info">Orange Info</option><option value="corporate">Corporate</option><option value="incentives">Incentives</option><option value="heroes">Pyramids Heroes</option><option value="events">Pyramids Events</option></select>
+                                <select id="adm-cat" class="w-full p-2.5 rounded-xl border text-[10px] font-bold uppercase dark:bg-gray-800 dark:border-gray-700 dark:text-white">
+                                    <option value="orange-info">Orange Info</option>
+                                    <option value="corporate">Corporate</option>
+                                    <option value="incentives">Incentives</option>
+                                    <option value="heroes">Pyramids Heroes</option>
+                                    <option value="events">Pyramids Events</option>
+                                </select>
                                 <input id="adm-title" required placeholder="Resource Title" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
-                                <label for="adm-file" class="w-full flex items-center justify-center p-4 border-2 border-dashed rounded-xl cursor-pointer hover:border-red-600 transition-colors ${s.darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'}"><div class="text-center"><i data-lucide="upload-cloud" class="w-6 h-6 mx-auto mb-2 opacity-40"></i><span id="file-status-text" class="text-[9px] font-black uppercase tracking-widest opacity-60 dark:text-gray-400">Select File</span></div><input type="file" id="adm-file" onchange="handleFileSelect(this)" class="hidden" accept="image/*,video/*,application/pdf"></label>
-                                <div class="flex justify-between p-2"><label class="text-[9px] dark:text-white flex items-center"><input type="radio" name="adm-type" value="photo" checked class="mr-1"> Photo</label><label class="text-[9px] dark:text-white flex items-center"><input type="radio" name="adm-type" value="video" class="mr-1"> Video</label><label class="text-[9px] dark:text-white flex items-center"><input type="radio" name="adm-type" value="pdf" class="mr-1"> PDF</label></div>
-                                <button type="submit" class="w-full bg-red-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest">Publish Content</button>
+                                <div class="relative w-full">
+                                    <input type="file" id="adm-file" onchange="handleFileSelect(this)" class="hidden" accept="image/*,video/*,application/pdf">
+                                    <label for="adm-file" class="w-full flex items-center justify-center p-4 border-2 border-dashed rounded-xl cursor-pointer hover:border-red-600 transition-colors ${s.darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'}">
+                                        <div class="text-center">
+                                            <i data-lucide="file-up" class="w-6 h-6 mx-auto mb-2 opacity-40"></i>
+                                            <span id="file-status-text" class="text-[9px] font-black uppercase tracking-widest opacity-60 dark:text-gray-400">Select File (< 750KB)</span>
+                                        </div>
+                                    </label>
+                                </div>
+                                <div class="flex justify-between p-2">
+                                    <label class="text-[9px] dark:text-white flex items-center"><input type="radio" name="adm-type" value="photo" checked class="mr-1"> Photo</label>
+                                    <label class="text-[9px] dark:text-white flex items-center"><input type="radio" name="adm-type" value="video" class="mr-1"> Video</label>
+                                    <label class="text-[9px] dark:text-white flex items-center"><input type="radio" name="adm-type" value="pdf" class="mr-1"> PDF</label>
+                                </div>
+                                <button type="submit" class="w-full bg-red-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest">Publish Resource</button>
                             </form>
                          </div>
 
-                         <!-- Create Account -->
+                         <!-- Create Agent -->
                          <div class="p-6 rounded-2xl border ${s.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                            <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white text-blue-600 flex items-center"><i data-lucide="user-plus" class="w-3.5 h-3.5 mr-2"></i> Manual Agent Entry</h3>
+                            <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white text-blue-600">Create Agent Account</h3>
                             <form onsubmit="handleAdminCreateUser(event)" class="space-y-3">
                                 <input id="adm-create-name" required placeholder="Full Name" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
                                 <input id="adm-create-email" required type="email" placeholder="Email Address" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
-                                <input id="adm-create-pass" required placeholder="Assigned Password" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
-                                <select id="adm-create-area" onchange="updateSignupShops('adm-create-area', 'adm-create-shop')" class="w-full p-2.5 rounded-xl border text-[10px] font-bold uppercase dark:bg-gray-800 dark:border-gray-700 dark:text-white"><option value="">SELECT AREA</option></select>
-                                <select id="adm-create-shop" class="w-full p-2.5 rounded-xl border text-[10px] font-bold uppercase dark:bg-gray-800 dark:border-gray-700 dark:text-white" disabled><option value="">SELECT SHOP</option></select>
-                                <button type="submit" class="w-full bg-blue-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-colors">Authorize Agent</button>
+                                <input id="adm-create-pass" required type="text" placeholder="Set Password" class="w-full p-2.5 rounded-xl border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
+                                <select id="adm-create-area" onchange="updateSignupShops('adm-create-area', 'adm-create-shop')" class="w-full p-2.5 rounded-xl border text-[10px] font-bold uppercase dark:bg-gray-800 dark:border-gray-700 dark:text-white">
+                                    <option value="">SELECT AREA</option>
+                                </select>
+                                <select id="adm-create-shop" class="w-full p-2.5 rounded-xl border text-[10px] font-bold uppercase dark:bg-gray-800 dark:border-gray-700 dark:text-white" disabled>
+                                    <option value="">SELECT SHOP</option>
+                                </select>
+                                <button type="submit" class="w-full bg-blue-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700">Create Agent Account</button>
                             </form>
                          </div>
                     </div>
 
                     <div class="lg:col-span-3 space-y-8">
-                        <!-- Dashboard Analytics -->
+                        <!-- Dashboard Analytics & Filtering -->
                         <div class="p-8 rounded-3xl border ${s.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
                             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-                                <h4 class="font-black uppercase tracking-widest text-[10px] dark:text-white flex items-center"><i data-lucide="bar-chart-2" class="w-4 h-4 mr-2 text-red-600"></i> Performance Matrix</h4>
+                                <h4 class="font-black uppercase tracking-widest text-[10px] dark:text-white flex items-center"><i data-lucide="bar-chart-2" class="w-4 h-4 mr-2 text-red-600"></i> Live User Distribution</h4>
                                 <div class="flex flex-wrap gap-2 w-full md:w-auto">
-                                    <input id="filter-search" oninput="applyAdminFilters()" value="${s.adminFilters.search}" placeholder="SEARCH AGENT..." class="px-3 py-1.5 rounded-lg border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
-                                    <select id="filter-area" onchange="updateSignupShops('filter-area', 'filter-shop'); applyAdminFilters();" class="px-3 py-1.5 rounded-lg border text-[10px] font-bold uppercase dark:bg-gray-800 dark:border-gray-700 dark:text-white"><option value="">ALL MANAGERS</option></select>
-                                    <select id="filter-shop" onchange="applyAdminFilters()" class="px-3 py-1.5 rounded-lg border text-[10px] font-bold uppercase dark:bg-gray-800 dark:border-gray-700 dark:text-white"><option value="">ALL SHOPS</option></select>
+                                    <input id="filter-search" oninput="applyAdminFilters()" value="${s.adminFilters.search}" placeholder="SEARCH NAME/EMAIL..." class="px-3 py-1.5 rounded-lg border text-[10px] uppercase font-bold dark:bg-gray-800 dark:border-gray-700 dark:text-white">
+                                    <select id="filter-area" onchange="updateSignupShops('filter-area', 'filter-shop'); applyAdminFilters();" class="px-3 py-1.5 rounded-lg border text-[10px] font-bold uppercase dark:bg-gray-800 dark:border-gray-700 dark:text-white">
+                                        <option value="">ALL MANAGERS</option>
+                                    </select>
+                                    <select id="filter-shop" onchange="applyAdminFilters()" class="px-3 py-1.5 rounded-lg border text-[10px] font-bold uppercase dark:bg-gray-800 dark:border-gray-700 dark:text-white">
+                                        <option value="">ALL SHOPS</option>
+                                    </select>
                                     <button onclick="resetAdminFilters()" class="p-1.5 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-400 hover:text-red-600 transition-colors"><i data-lucide="rotate-ccw" class="w-4 h-4"></i></button>
                                 </div>
                             </div>
+
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div><p class="text-[9px] font-black uppercase tracking-widest mb-3 opacity-40">By Area Manager</p><div class="space-y-2">${Object.entries(managerStats).map(([m, c]) => `<div class="flex justify-between items-center text-[10px] p-2.5 bg-gray-50 dark:bg-gray-800 rounded-xl"><span class="font-bold uppercase">${m}</span><span class="bg-black text-white px-2 py-0.5 rounded-md font-black">${c}</span></div>`).join('')}</div></div>
-                                <div><p class="text-[9px] font-black uppercase tracking-widest mb-3 opacity-40">By Shop Location</p><div class="space-y-2 max-h-[250px] overflow-y-auto custom-scrollbar pr-1">${Object.entries(shopStats).map(([sh, c]) => `<div class="flex justify-between items-center text-[10px] p-2.5 bg-gray-50 dark:bg-gray-800 rounded-xl"><span class="font-bold uppercase">${sh}</span><span class="bg-red-600 text-white px-2 py-0.5 rounded-md font-black">${c}</span></div>`).join('')}</div></div>
+                                <div>
+                                    <p class="text-[9px] font-black uppercase tracking-widest mb-3 opacity-40">Filtered By Area Manager</p>
+                                    <div class="space-y-2">
+                                        ${Object.entries(managerStats).sort((a,b) => b[1]-a[1]).map(([m, c]) => `
+                                            <div class="flex justify-between items-center text-[10px] p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                                <span class="font-bold uppercase">${m}</span>
+                                                <span class="bg-black text-white px-2 py-0.5 rounded-md font-black">${c}</span>
+                                            </div>
+                                        `).join('')}
+                                        ${Object.keys(managerStats).length === 0 ? '<p class="text-[9px] opacity-30 uppercase font-bold">No managers in view</p>' : ''}
+                                    </div>
+                                </div>
+                                <div>
+                                    <p class="text-[9px] font-black uppercase tracking-widest mb-3 opacity-40">Filtered By Shop Location</p>
+                                    <div class="space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar">
+                                        ${Object.entries(shopStats).sort((a,b) => b[1]-a[1]).map(([shop, c]) => `
+                                            <div class="flex justify-between items-center text-[10px] p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                                <span class="font-bold uppercase">${shop}</span>
+                                                <span class="bg-red-600 text-white px-2 py-0.5 rounded-md font-black">${c}</span>
+                                            </div>
+                                        `).join('')}
+                                        ${Object.keys(shopStats).length === 0 ? '<p class="text-[9px] opacity-30 uppercase font-bold">No shops in view</p>' : ''}
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        
+
                         <!-- Pending Applications -->
                         ${requests.length > 0 ? `
-                        <div class="p-6 rounded-3xl border-2 border-red-600 ${s.darkMode ? 'bg-red-950/10' : 'bg-red-50'} animate-pulse">
-                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 flex justify-between text-red-600">Action Required: Pending Approvals <span class="bg-red-600 text-white px-2 rounded-full">${requests.length}</span></h4>
+                        <div class="p-6 rounded-3xl border-2 border-red-600 ${s.darkMode ? 'bg-red-950/10' : 'bg-red-50'}">
+                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 flex justify-between text-red-600">Pending Applications <span class="bg-red-600 text-white px-2 rounded-full">${requests.length}</span></h4>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 ${requests.map(req => `
-                                    <div class="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-red-100 dark:border-red-900 shadow-sm flex justify-between items-center">
+                                    <div class="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-red-100 shadow-sm flex justify-between items-center">
                                         <div>
-                                            <p class="text-xs font-black uppercase dark:text-white leading-none mb-1">${req.agentName}</p>
-                                            <p class="text-[10px] opacity-60 dark:text-gray-400 mb-1 leading-none">${req.email}</p>
-                                            <p class="text-[8px] font-black uppercase text-red-600 tracking-wider">${req.shopName}</p>
+                                            <p class="text-xs font-black uppercase dark:text-white">${req.agentName}</p>
+                                            <p class="text-[10px] opacity-60 dark:text-gray-400 mb-1">${req.email}</p>
+                                            <p class="text-[8px] font-black uppercase text-red-600">${req.shopName}</p>
                                         </div>
                                         <div class="flex space-x-2">
-                                            <button onclick='handleApproveRequest(${JSON.stringify(req).replace(/'/g, "&apos;")})' class="p-2.5 bg-green-50 text-green-600 rounded-xl hover:bg-green-600 hover:text-white transition-all shadow-sm"><i data-lucide="check" class="w-4 h-4"></i></button>
-                                            <button onclick="handleRejectRequest('${req.id}')" class="p-2.5 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm"><i data-lucide="x" class="w-4 h-4"></i></button>
+                                            <button onclick='handleApproveRequest(${JSON.stringify(req).replace(/'/g, "&apos;")})' class="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-600 hover:text-white transition-all"><i data-lucide="check" class="w-4 h-4"></i></button>
+                                            <button onclick="handleRejectRequest('${req.id}')" class="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all"><i data-lucide="x" class="w-4 h-4"></i></button>
                                         </div>
                                     </div>`).join('')}
                             </div>
                         </div>` : ''}
 
-                        <!-- Agent Directory -->
+                        <!-- Agent Directory (Filtered) -->
                         <div class="p-6 rounded-3xl border ${s.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white">Authorized Agent Registry <span class="text-red-600 font-black ml-2">${filteredUsers.length} Results</span></h4>
+                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white">Agent Directory <span class="text-red-600 font-black ml-2">${filteredUsers.length} Found</span></h4>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 ${filteredUsers.map(u => `
-                                    <div class="p-4 rounded-xl bg-gray-50 dark:bg-gray-800 border border-transparent hover:border-gray-200 dark:hover:border-gray-700 transition-all flex justify-between items-center">
+                                    <div class="p-4 rounded-xl bg-gray-50 dark:bg-gray-800 flex justify-between items-center group">
                                         <div>
                                             <p class="text-[10px] font-black uppercase dark:text-white leading-none mb-1">${u.agentName}</p>
-                                            <p class="text-[9px] opacity-60 dark:text-gray-400 mb-1 leading-none">${u.email}</p>
-                                            <p class="text-[8px] font-black uppercase text-red-600 tracking-wider">${u.shopName} | ${u.areaManager}</p>
+                                            <p class="text-[9px] opacity-60 dark:text-gray-400 mb-1">${u.email}</p>
+                                            <p class="text-[8px] font-black uppercase text-red-600">${u.shopName} | ${u.areaManager}</p>
                                         </div>
                                         <button onclick="handleDeleteUserAccess('${u.id}')" class="text-gray-400 hover:text-red-600 transition-colors">
                                             <i data-lucide="user-x" class="w-4 h-4"></i>
                                         </button>
                                     </div>`).join('')}
+                                ${filteredUsers.length === 0 ? '<div class="col-span-2 py-8 text-center opacity-30 text-[10px] font-black uppercase">No agents match your filters</div>' : ''}
                             </div>
                         </div>
 
-                        <!-- Content Inventory -->
+                        <!-- Resource Inventory -->
                         <div class="p-6 rounded-3xl border ${s.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
-                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 dark:text-white">Portal Resource Inventory</h4>
+                            <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 dark:text-white">Platform Resources</h4>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 ${allMaterials.map(m => `
                                     <div class="p-4 rounded-xl bg-gray-50 dark:bg-gray-800 flex justify-between items-center group">
                                         <div class="overflow-hidden">
-                                            <p class="text-[10px] font-black uppercase dark:text-white truncate leading-none mb-1">${m.title}</p>
-                                            <p class="text-[8px] opacity-40 uppercase font-bold">${m.category}</p>
+                                            <p class="text-[10px] font-black uppercase dark:text-white truncate">${m.title}</p>
+                                            <p class="text-[8px] opacity-40 uppercase">${m.category}</p>
                                         </div>
                                         <div class="flex space-x-2">
                                             <button onclick='openViewer(${JSON.stringify(m).replace(/'/g, "&apos;")})' class="text-gray-400 hover:text-black dark:hover:text-white transition-colors"><i data-lucide="eye" class="w-4 h-4"></i></button>
                                             <button onclick="handleDeleteMaterial('${m.id}')" class="text-gray-400 hover:text-red-600 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                                         </div>
                                     </div>`).join('')}
+                                ${allMaterials.length === 0 ? '<div class="col-span-3 py-8 text-center opacity-30 text-[10px] font-black uppercase">Inventory is empty</div>' : ''}
                             </div>
                         </div>
                     </div>
@@ -955,19 +1098,79 @@
         function renderServiceDetail(catId) {
             const s = window.state;
             const items = s.materials[catId] || [];
+            
+            // Special rendering for heroes/events
             if (catId === 'heroes') return renderHeroesPortal();
             if (catId === 'events') return renderEventsPortal();
-            return `<div class="max-w-4xl mx-auto px-4 py-12 fade-in"><button onclick="navigateTo('agent-dashboard')" class="flex items-center text-xs font-bold uppercase tracking-widest text-red-600 mb-8 hover:opacity-70"><i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i> Back to Dashboard</button><h1 class="text-4xl font-black uppercase tracking-tighter mb-12 dark:text-white">${catId.replace('-', ' ')} <span class="text-red-600">Portal</span></h1><div class="grid grid-cols-1 sm:grid-cols-2 gap-4">${items.map(i => `<div onclick='openViewer(${JSON.stringify(i).replace(/'/g, "&apos;")})' class="p-6 rounded-xl border ${s.darkMode ? 'bg-gray-900 border-gray-800 hover:bg-gray-800' : 'bg-white border-gray-100 hover:shadow-lg'} transition-all flex justify-between items-center group cursor-pointer"><div><p class="text-xs font-bold uppercase tracking-widest mb-1 dark:text-white">${i.title}</p><p class="text-[9px] font-medium opacity-40 uppercase tracking-tighter dark:text-gray-500">Preview Data</p></div><div class="text-red-600 group-hover:scale-110 transition-transform"><i data-lucide="${i.type === 'pdf' ? 'file-text' : i.type === 'video' ? 'video' : 'image'}" class="w-5 h-5"></i></div></div>`).join('')}</div></div>`;
+
+            return `<div class="max-w-4xl mx-auto px-4 py-12 fade-in">
+                <button onclick="navigateTo('agent-dashboard')" class="flex items-center text-xs font-bold uppercase tracking-widest text-red-600 mb-8 hover:opacity-70">
+                    <i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i> Back to Dashboard
+                </button>
+                <h1 class="text-4xl font-black uppercase tracking-tighter mb-12 dark:text-white">${catId.replace('-', ' ')} <span class="text-red-600">Portal</span></h1>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    ${items.map(i => `
+                        <div onclick='openViewer(${JSON.stringify(i).replace(/'/g, "&apos;")})' class="p-6 rounded-xl border ${s.darkMode ? 'bg-gray-900 border-gray-800 hover:bg-gray-800' : 'bg-white border-gray-100 hover:shadow-lg'} transition-all flex justify-between items-center group cursor-pointer">
+                            <div>
+                                <p class="text-xs font-bold uppercase tracking-widest mb-1 dark:text-white">${i.title}</p>
+                                <p class="text-[9px] font-medium opacity-40 uppercase tracking-tighter dark:text-gray-500">Preview Data</p>
+                            </div>
+                            <div class="text-red-600 group-hover:scale-110 transition-transform">
+                                <i data-lucide="${i.type === 'pdf' ? 'file-text' : i.type === 'video' ? 'video' : 'image'}" class="w-5 h-5"></i>
+                            </div>
+                        </div>`).join('')}
+                    ${items.length === 0 ? '<div class="col-span-2 py-20 text-center opacity-30 uppercase font-black text-xs tracking-widest">No materials uploaded yet.</div>' : ''}
+                </div>
+            </div>`;
         }
 
         function renderHeroesPortal() {
             const items = window.state.materials['heroes'] || [];
-            return `<div class="max-w-7xl mx-auto px-4 py-12 fade-in"><button onclick="navigateTo('home')" class="flex items-center text-xs font-bold uppercase tracking-widest text-red-600 mb-8 hover:opacity-70"><i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i> Back Home</button><div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8"><h1 class="text-4xl font-black uppercase tracking-tighter text-gray-900 dark:text-white">Pyramids <span class="text-red-600">Heroes</span></h1><p class="text-gray-500 text-xs uppercase font-bold tracking-widest mt-2">Recognizing Excellence & Achievement</p></div><div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">${items.map(i => `<div onclick='openViewer(${JSON.stringify(i).replace(/'/g, "&apos;")})' class="group cursor-pointer"><div class="aspect-[210/297] bg-white border dark:bg-gray-900 dark:border-gray-800 rounded-2xl overflow-hidden mb-4 shadow-sm group-hover:shadow-2xl transition-all"><img src="${i.url}" class="w-full h-full object-cover"></div><div class="px-2 text-center md:text-left"><p class="text-sm font-black uppercase dark:text-white leading-tight mb-1">${i.title}</p><div class="text-[9px] font-bold uppercase tracking-widest opacity-50 dark:text-gray-400">Achiever Profile</div></div></div>`).join('')}</div></div>`;
+            return `<div class="max-w-7xl mx-auto px-4 py-12 fade-in">
+                <button onclick="navigateTo('home')" class="flex items-center text-xs font-bold uppercase tracking-widest text-red-600 mb-8 hover:opacity-70">
+                    <i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i> Back Home
+                </button>
+                <div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8">
+                    <h1 class="text-4xl font-black uppercase tracking-tighter text-gray-900 dark:text-white">Pyramids <span class="text-red-600">Heroes</span></h1>
+                    <p class="text-gray-500 text-xs uppercase font-bold tracking-widest mt-2">Recognizing Excellence & Achievement</p>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                    ${items.map(i => `
+                        <div onclick='openViewer(${JSON.stringify(i).replace(/'/g, "&apos;")})' class="group cursor-pointer">
+                            <div class="aspect-[210/297] bg-white border dark:bg-gray-900 dark:border-gray-800 rounded-2xl overflow-hidden mb-4 shadow-sm group-hover:shadow-2xl transition-all">
+                                <img src="${i.url}" class="w-full h-full object-cover">
+                            </div>
+                            <div class="px-2 text-center md:text-left">
+                                <p class="text-sm font-black uppercase dark:text-white leading-tight mb-1">${i.title}</p>
+                                <div class="text-[9px] font-bold uppercase tracking-widest opacity-50 dark:text-gray-400">Achiever Profile</div>
+                            </div>
+                        </div>`).join('')}
+                    ${items.length === 0 ? '<div class="col-span-4 py-20 text-center opacity-30 uppercase font-black text-xs tracking-widest border-2 border-dashed rounded-3xl">No heroes announced yet.</div>' : ''}
+                </div>
+            </div>`;
         }
 
         function renderEventsPortal() {
             const items = window.state.materials['events'] || [];
-            return `<div class="max-w-7xl mx-auto px-4 py-12 fade-in"><button onclick="navigateTo('home')" class="flex items-center text-xs font-bold uppercase tracking-widest text-red-600 mb-8 hover:opacity-70"><i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i> Back Home</button><div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8"><h1 class="text-4xl font-black uppercase tracking-tighter text-gray-900 dark:text-white">Pyramids <span class="text-red-600">Events</span></h1><p class="text-gray-500 text-xs uppercase font-bold tracking-widest mt-2">Captured Moments & Memories</p></div><div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">${items.map(i => `<div onclick='openViewer(${JSON.stringify(i).replace(/'/g, "&apos;")})' class="relative group cursor-pointer aspect-video rounded-3xl overflow-hidden border dark:border-gray-800"><img src="${i.url}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"><div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-6 flex items-end"><p class="text-white text-[10px] font-black uppercase tracking-widest">${i.title}</p></div></div>`).join('')}</div></div>`;
+            return `<div class="max-w-7xl mx-auto px-4 py-12 fade-in">
+                <button onclick="navigateTo('home')" class="flex items-center text-xs font-bold uppercase tracking-widest text-red-600 mb-8 hover:opacity-70">
+                    <i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i> Back Home
+                </button>
+                <div class="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8">
+                    <h1 class="text-4xl font-black uppercase tracking-tighter text-gray-900 dark:text-white">Pyramids <span class="text-red-600">Events</span></h1>
+                    <p class="text-gray-500 text-xs uppercase font-bold tracking-widest mt-2">Captured Moments & Memories</p>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    ${items.map(i => `
+                        <div onclick='openViewer(${JSON.stringify(i).replace(/'/g, "&apos;")})' class="relative group cursor-pointer aspect-video rounded-3xl overflow-hidden border dark:border-gray-800">
+                            <img src="${i.url}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-6 flex items-end">
+                                <p class="text-white text-[10px] font-black uppercase tracking-widest">${i.title}</p>
+                            </div>
+                        </div>`).join('')}
+                    ${items.length === 0 ? '<div class="col-span-3 py-20 text-center opacity-30 uppercase font-black text-xs tracking-widest border-2 border-dashed rounded-3xl">No events captured yet.</div>' : ''}
+                </div>
+            </div>`;
         }
 
         window.onload = () => {
