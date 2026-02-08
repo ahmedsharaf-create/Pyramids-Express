@@ -14,8 +14,7 @@ import {
   doc, 
   setDoc, 
   onSnapshot, 
-  deleteDoc, 
-  query 
+  deleteDoc 
 } from 'firebase/firestore';
 import { 
   getStorage, 
@@ -64,14 +63,12 @@ const App = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [activeViewer, setActiveViewer] = useState(null);
 
-  // --- Dynamic Data State ---
   const [materials, setMaterials] = useState({
     'orange-info': [],
     'corporate': [],
     'incentives': []
   });
 
-  // --- Auth Logic ---
   useEffect(() => {
     const initAuth = async () => {
       if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -100,7 +97,6 @@ const App = () => {
     return () => unsubscribe();
   }, []);
 
-  // --- Data Sync Logic ---
   useEffect(() => {
     if (!isLoggedIn) return;
 
@@ -114,18 +110,14 @@ const App = () => {
         }
       });
       setMaterials(newMaterials);
-    }, (error) => console.error("Firestore Sync Error:", error));
+    });
 
     return () => unsubscribe();
   }, [isLoggedIn]);
 
   const toggleTheme = () => {
     setDarkMode(!darkMode);
-    if (!darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    document.documentElement.classList.toggle('dark');
   };
 
   const handleLogin = async (e) => {
@@ -156,6 +148,12 @@ const App = () => {
     const type = formData.get('type');
 
     if (!file) return alert("Please select a file.");
+    
+    // Set 20MB Limit
+    const MAX_SIZE = 20 * 1024 * 1024; 
+    if (file.size > MAX_SIZE) {
+      return alert("File is too large! Maximum limit is 20MB.");
+    }
 
     setIsUploading(true);
     const storageRef = ref(storage, `uploads/${appId}/${Date.now()}_${file.name}`);
@@ -200,8 +198,6 @@ const App = () => {
     }
   };
 
-  // --- Components ---
-
   const Navbar = () => (
     <nav className={`fixed top-0 w-full z-50 border-b transition-all duration-300 ${darkMode ? 'bg-black/90 border-gray-800' : 'bg-white/95 border-gray-100'}`}>
       <div className="max-w-7xl mx-auto px-4 lg:px-8">
@@ -210,7 +206,6 @@ const App = () => {
             <div className={`${darkMode ? 'bg-red-600' : 'bg-black'} text-white w-8 h-8 rounded-md flex items-center justify-center font-bold text-lg`}>pe</div>
             <span className={`font-bold text-lg tracking-tight uppercase ${darkMode ? 'text-red-600' : 'text-black'}`}>Pyramids Express</span>
           </div>
-
           <div className="hidden md:flex items-center space-x-6">
             <button onClick={toggleTheme} className="p-2">{darkMode ? <Sun size={18} className="text-yellow-400" /> : <Moon size={18} className="text-gray-600" />}</button>
             {isLoggedIn && !isAdmin && <button onClick={() => setCurrentPage('agent-dashboard')} className="text-xs uppercase font-bold tracking-widest hover:text-red-600">Dashboard</button>}
@@ -241,224 +236,152 @@ const App = () => {
             {activeViewer.type === 'video' && <video src={activeViewer.url} controls autoPlay className="max-w-full max-h-[80vh]" />}
             {activeViewer.type === 'pdf' && <iframe src={activeViewer.url} className="w-full h-[80vh] border-0" title="PDF Preview" />}
           </div>
-          <div className="p-6 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800">
-            <h3 className="font-black uppercase tracking-widest text-sm dark:text-white mb-1">{activeViewer.title}</h3>
-            <p className="text-xs opacity-60 dark:text-gray-400">{activeViewer.desc}</p>
+          <div className="p-6 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 text-black dark:text-white">
+            <h3 className="font-black uppercase tracking-widest text-sm mb-1">{activeViewer.title}</h3>
+            <p className="text-xs opacity-60">{activeViewer.desc}</p>
           </div>
         </div>
       </div>
     );
   };
 
-  const AdminPanel = () => {
-    return (
-      <div className="mt-24 max-w-6xl mx-auto px-4 pb-20 animate-in fade-in duration-500">
-        <div className="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8 flex justify-between items-end">
-          <div>
-            <h2 className="text-4xl font-black uppercase tracking-tight mb-2">Management</h2>
-            <p className="text-red-600 text-xs font-bold uppercase tracking-widest">Administrator Dashboard</p>
-          </div>
-          <button onClick={() => setCurrentPage('agent-dashboard')} className="text-[10px] font-black uppercase tracking-widest px-4 py-2 border rounded-xl hover:bg-black hover:text-white transition-all">Preview Agent View</button>
+  const AdminPanel = () => (
+    <div className="mt-24 max-w-6xl mx-auto px-4 pb-20 animate-in fade-in duration-500">
+      <div className="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8 flex justify-between items-end">
+        <div>
+          <h2 className="text-4xl font-black uppercase tracking-tight mb-2">Management</h2>
+          <p className="text-red-600 text-xs font-bold uppercase tracking-widest">Administrator Dashboard</p>
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-          <div className={`p-8 rounded-3xl border h-fit ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}`}>
-            <h3 className="font-black uppercase tracking-widest text-sm mb-6 flex items-center text-red-600"><Plus size={18} className="mr-2" /> Upload Resource</h3>
-            <form onSubmit={handleFileUpload} className="space-y-5">
-              <select name="category" className={`w-full p-3 rounded-xl border text-xs font-bold uppercase ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
-                <option value="orange-info">Orange Info</option>
-                <option value="corporate">Corporate</option>
-                <option value="incentives">Incentives</option>
-              </select>
-              <input name="title" required placeholder="Title" className={`w-full p-3 rounded-xl border text-xs ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`} />
-              <textarea name="desc" placeholder="Brief description..." className={`w-full p-3 rounded-xl border text-xs h-20 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`} />
-              <div className="flex justify-between text-[10px] font-bold uppercase opacity-60">
-                {['photo', 'video', 'pdf'].map(t => <label key={t} className="flex items-center cursor-pointer"><input type="radio" name="type" value={t} defaultChecked={t==='pdf'} className="mr-1" /> {t}</label>)}
+        <button onClick={() => setCurrentPage('agent-dashboard')} className="text-[10px] font-black uppercase tracking-widest px-4 py-2 border rounded-xl hover:bg-black hover:text-white transition-all">Agent View</button>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        <div className={`p-8 rounded-3xl border h-fit ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}`}>
+          <h3 className="font-black uppercase tracking-widest text-sm mb-6 text-red-600 flex items-center"><Plus className="mr-2" size={18}/> Upload</h3>
+          <form onSubmit={handleFileUpload} className="space-y-5">
+            <select name="category" className={`w-full p-3 rounded-xl border text-xs font-bold uppercase ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
+              <option value="orange-info">Orange Info</option>
+              <option value="corporate">Corporate</option>
+              <option value="incentives">Incentives</option>
+            </select>
+            <input name="title" required placeholder="Title" className={`w-full p-3 rounded-xl border text-xs ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`} />
+            <textarea name="desc" placeholder="Description" className={`w-full p-3 rounded-xl border text-xs h-20 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`} />
+            <div className="flex justify-between text-[10px] font-bold uppercase opacity-60">
+              {['photo', 'video', 'pdf'].map(t => <label key={t} className="flex items-center cursor-pointer"><input type="radio" name="type" value={t} defaultChecked={t==='pdf'} className="mr-1" /> {t}</label>)}
+            </div>
+            <div className="relative border-2 border-dashed rounded-xl p-6 text-center hover:border-red-600 cursor-pointer bg-gray-50 dark:bg-gray-800">
+              <input type="file" name="file" className="absolute inset-0 opacity-0 cursor-pointer" required />
+              <FileUp className="mx-auto mb-2 opacity-30" />
+              <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Select File (Max 20MB)</span>
+            </div>
+            {isUploading && (
+              <div className="space-y-2 text-center">
+                <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden"><div className="bg-red-600 h-2 transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div></div>
+                <p className="text-[10px] font-black uppercase text-red-600">Uploading: {uploadProgress}%</p>
               </div>
-              
-              <div className="relative border-2 border-dashed rounded-xl p-6 text-center hover:border-red-600 transition-colors cursor-pointer bg-gray-50 dark:bg-gray-800">
-                <input type="file" name="file" className="absolute inset-0 opacity-0 cursor-pointer" required />
-                <FileUp className="mx-auto mb-2 opacity-30" />
-                <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Choose Local File</span>
-              </div>
-
-              {isUploading && (
-                <div className="space-y-2">
-                  <div className="w-full bg-gray-100 rounded-full h-2 dark:bg-gray-700 overflow-hidden">
-                    <div className="bg-red-600 h-2 transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
-                  </div>
-                  <p className="text-[10px] text-center font-black uppercase tracking-widest text-red-600">Uploading: {uploadProgress}%</p>
-                </div>
-              )}
-
-              <button type="submit" disabled={isUploading} className="w-full bg-red-600 text-white py-4 rounded-xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-red-700 transition-all disabled:opacity-50">
-                {isUploading ? <Loader2 className="animate-spin mx-auto" /> : 'Confirm Post'}
-              </button>
-            </form>
-          </div>
-
-          <div className="lg:col-span-2 space-y-8">
-            {Object.entries(materials).map(([cat, items]) => (
-              <div key={cat} className={`p-6 rounded-3xl border ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}`}>
-                <h4 className="font-black uppercase tracking-widest text-xs mb-4 flex justify-between">
-                  {cat.replace('-', ' ')} <span className="text-red-600">{items.length} Items</span>
-                </h4>
-                <div className="space-y-3">
-                  {items.map(item => (
-                    <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800">
-                      <div className="flex items-center space-x-3">
-                        <span className="text-red-600">{item.type === 'video' ? <Video size={16}/> : item.type === 'pdf' ? <FileText size={16}/> : <ImageIcon size={16}/>}</span>
-                        <div>
-                          <p className="text-xs font-bold uppercase leading-none mb-1">{item.title}</p>
-                          <p className="text-[9px] opacity-40 uppercase truncate max-w-[200px]">{item.desc}</p>
-                        </div>
-                      </div>
-                      <div className="flex space-x-2">
-                         <button onClick={() => setActiveViewer(item)} className="p-2 text-gray-400 hover:text-black dark:hover:text-white transition-colors"><Eye size={16} /></button>
-                         <button onClick={() => deleteMaterial(item.id)} className="p-2 text-gray-400 hover:text-red-600 transition-colors"><Trash2 size={16} /></button>
-                      </div>
+            )}
+            <button type="submit" disabled={isUploading} className="w-full bg-red-600 text-white py-4 rounded-xl font-black uppercase text-xs tracking-widest shadow-xl disabled:opacity-50">
+              {isUploading ? <Loader2 className="animate-spin mx-auto" /> : 'Confirm Post'}
+            </button>
+          </form>
+        </div>
+        <div className="lg:col-span-2 space-y-6">
+          {Object.entries(materials).map(([cat, items]) => (
+            <div key={cat} className={`p-6 rounded-3xl border ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}`}>
+              <h4 className="font-black uppercase text-xs mb-4 text-red-600">{cat.replace('-', ' ')} ({items.length})</h4>
+              <div className="space-y-2">
+                {items.map(item => (
+                  <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800">
+                    <div className="flex items-center space-x-3">
+                      <span className="text-red-600">{item.type === 'video' ? <Video size={16}/> : item.type === 'pdf' ? <FileText size={16}/> : <ImageIcon size={16}/>}</span>
+                      <span className="text-xs font-bold uppercase">{item.title}</span>
                     </div>
-                  ))}
-                  {items.length === 0 && <p className="text-[10px] opacity-30 italic uppercase">No resources published.</p>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const ExternalHome = () => (
-    <div className="animate-in fade-in duration-700">
-      <section className="relative h-[450px] w-full mt-16 overflow-hidden flex items-center justify-center">
-        <div className="absolute inset-0 z-0">
-          <img src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=2000" className="w-full h-full object-cover brightness-[0.4]" alt="Team" />
-          <div className={`absolute inset-0 opacity-40 ${darkMode ? 'bg-gradient-to-r from-black to-red-900' : 'bg-gradient-to-r from-black to-orange-600'}`}></div>
-        </div>
-        <div className="relative z-10 text-center px-4">
-          <div className="mb-4 inline-block bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-1 rounded text-[10px] font-bold uppercase tracking-[0.2em] text-white">Partner Orange Egypt</div>
-          <h1 className="text-5xl md:text-7xl font-black text-white uppercase tracking-tighter leading-none mb-4">One <span className="text-red-600">Team</span> One <span className="text-red-600">Goal</span></h1>
-          <p className="text-white text-lg md:text-xl font-light tracking-wide uppercase opacity-90">Reliability & Excellence</p>
-          <button onClick={() => setShowAuth(true)} className="mt-8 bg-red-600 text-white px-8 py-3 rounded font-bold uppercase text-xs tracking-widest hover:bg-red-700 transition-all shadow-2xl">Portal Access</button>
-        </div>
-      </section>
-      <div className="max-w-7xl mx-auto px-4 py-20 text-center">
-          <p className="text-xs uppercase font-black tracking-[0.3em] opacity-30">Our Mission</p>
-          <h2 className="text-3xl font-black uppercase mt-4 mb-8">Delivering quality <span className="text-red-600">logistics</span> solutions</h2>
-      </div>
-    </div>
-  );
-
-  const Dashboard = () => {
-    const services = [
-      { id: 'medical', title: 'Medical Insurance', subtitle: 'Omega Care Network', icon: <HeartPulse />, type: 'portal' },
-      { id: 'orange-info', title: 'Orange Info', subtitle: 'Sales & Tariffs', icon: <Globe /> },
-      { id: 'corporate', title: 'Corporate Materials', subtitle: 'Solutions', icon: <Briefcase /> },
-      { id: 'incentives', title: 'Incentives', subtitle: 'Rewards', icon: <Award /> }
-    ];
-
-    return (
-      <div className="mt-24 max-w-7xl mx-auto px-4 pb-20 animate-in slide-in-from-bottom-4 duration-500">
-        <div className="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8 flex justify-between items-end">
-          <div>
-            <h2 className="text-3xl font-black uppercase tracking-tight mb-2">Agent Resources</h2>
-            <p className="text-gray-500 text-sm uppercase tracking-widest">Authorized Access Only</p>
-          </div>
-          {isAdmin && <button onClick={() => setCurrentPage('admin-panel')} className="text-[10px] font-bold uppercase px-4 py-2 border rounded-xl">Open Admin</button>}
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {services.map((s) => (
-            <div 
-              key={s.id}
-              onClick={() => setCurrentPage(s.id === 'medical' ? 'service-medical' : `service-${s.id}`)}
-              className={`group p-8 rounded-2xl border transition-all cursor-pointer ${darkMode ? 'bg-gray-900 border-gray-800 hover:border-red-600' : 'bg-white border-gray-100 hover:border-black shadow-sm hover:shadow-xl'}`}
-            >
-              <div className={`w-14 h-14 rounded-xl flex items-center justify-center mb-6 transition-colors ${darkMode ? 'bg-red-600/10 text-red-600' : 'bg-black/5 text-black group-hover:bg-red-600 group-hover:text-white'}`}>
-                {s.icon}
-              </div>
-              <h3 className="font-black uppercase text-lg tracking-tight mb-1">{s.title}</h3>
-              <p className="text-red-600 text-xs font-bold uppercase tracking-widest mb-6">{s.subtitle}</p>
-              <div className="flex items-center text-xs font-bold uppercase tracking-widest group-hover:translate-x-2 transition-transform">
-                View Portal <ChevronRight size={14} className="ml-1" />
+                    <div className="flex space-x-1">
+                       <button onClick={() => setActiveViewer(item)} className="p-2 text-gray-400 hover:text-black dark:hover:text-white"><Eye size={16} /></button>
+                       <button onClick={() => deleteMaterial(item.id)} className="p-2 text-gray-400 hover:text-red-600"><Trash2 size={16} /></button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           ))}
         </div>
       </div>
-    );
-  };
-
-  const ServiceDetailPage = (id) => {
-    const catId = id.replace('service-', '');
-    const items = materials[catId] || [];
-
-    return (
-      <div className="mt-24 max-w-4xl mx-auto px-4 pb-20 animate-in fade-in duration-500">
-        <button onClick={() => setCurrentPage('agent-dashboard')} className="flex items-center text-xs font-bold uppercase tracking-widest text-red-600 mb-8 hover:opacity-70">
-          <ArrowLeft size={16} className="mr-2" /> Back to Dashboard
-        </button>
-        <h1 className="text-4xl font-black uppercase tracking-tighter mb-12">{catId.replace('-', ' ')} <span className="text-red-600">Portal</span></h1>
-        {items.length === 0 ? (
-          <div className="py-20 text-center opacity-30 uppercase font-black text-xs tracking-widest border-2 border-dashed rounded-3xl">No resources published yet.</div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {items.map((item) => (
-              <div 
-                key={item.id}
-                onClick={() => setActiveViewer(item)}
-                className={`p-6 text-left rounded-xl border font-bold uppercase tracking-widest text-xs flex justify-between items-center transition-all cursor-pointer ${darkMode ? 'bg-gray-900 border-gray-800 hover:bg-gray-800' : 'bg-white border-gray-100 hover:shadow-md'}`}
-              >
-                <div>
-                  <p className="mb-1 dark:text-white">{item.title}</p>
-                  <p className="text-[9px] font-normal opacity-40 lowercase">{item.desc}</p>
-                </div>
-                <div className="text-red-600">
-                  {item.type === 'video' ? <Video size={18} /> : item.type === 'pdf' ? <FileText size={18} /> : <ImageIcon size={18} />}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
+    </div>
+  );
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-gray-950 text-white' : 'bg-white text-gray-900'}`}>
       <Navbar />
       <MediaViewer />
 
-      {currentPage === 'home' && <ExternalHome />}
-      {currentPage === 'agent-dashboard' && <Dashboard />}
+      {currentPage === 'home' && (
+        <div className="mt-16 pt-32 text-center animate-in fade-in duration-1000">
+          <h1 className="text-6xl font-black uppercase tracking-tighter mb-4">Express <span className="text-red-600">Portal</span></h1>
+          <p className="opacity-60 uppercase tracking-[0.3em] text-xs">Pyramids Express Quality App</p>
+          <button onClick={() => setShowAuth(true)} className="mt-10 bg-red-600 text-white px-10 py-4 rounded-xl font-black uppercase text-xs tracking-widest shadow-2xl">Authorize Session</button>
+        </div>
+      )}
+
+      {currentPage === 'agent-dashboard' && (
+        <div className="mt-24 max-w-7xl mx-auto px-4 pb-20 animate-in slide-in-from-bottom-4 duration-500">
+          <div className="mb-12 border-b border-gray-100 dark:border-gray-800 pb-8 flex justify-between items-end">
+            <h2 className="text-3xl font-black uppercase tracking-tight">Agent Dashboard</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              { id: 'medical', title: 'Medical Insurance', sub: 'Omega Care', icon: <HeartPulse />, type: 'portal' },
+              { id: 'orange-info', title: 'Orange Info', sub: 'Sales & Tariffs', icon: <Globe /> },
+              { id: 'corporate', title: 'Corporate Materials', sub: 'Solutions', icon: <Briefcase /> },
+              { id: 'incentives', title: 'Incentives', sub: 'Rewards', icon: <Award /> }
+            ].map((s) => (
+              <div key={s.id} onClick={() => setCurrentPage(s.id === 'medical' ? 'service-medical' : `service-${s.id}`)} className={`group p-8 rounded-2xl border cursor-pointer transition-all ${darkMode ? 'bg-gray-900 border-gray-800 hover:border-red-600' : 'bg-white border-gray-100 hover:border-black shadow-sm hover:shadow-xl'}`}>
+                <div className={`w-14 h-14 rounded-xl flex items-center justify-center mb-6 ${darkMode ? 'bg-red-600/10 text-red-600' : 'bg-black/5 text-black group-hover:bg-red-600 group-hover:text-white'}`}>{s.icon}</div>
+                <h3 className="font-black uppercase text-lg mb-1">{s.title}</h3>
+                <p className="text-red-600 text-xs font-bold uppercase mb-6">{s.sub}</p>
+                <div className="flex items-center text-xs font-bold uppercase group-hover:translate-x-2 transition-transform">View Portal <ChevronRight size={14} className="ml-1" /></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {currentPage === 'admin-panel' && <AdminPanel />}
+
       {currentPage === 'service-medical' && (
         <div className="mt-24 max-w-7xl mx-auto px-4 pb-20 animate-in fade-in duration-500">
-          <button onClick={() => setCurrentPage('agent-dashboard')} className="flex items-center text-xs font-bold uppercase tracking-widest text-red-600 mb-8 hover:opacity-70"><ArrowLeft size={16} className="mr-2" /> Back</button>
+          <button onClick={() => setCurrentPage('agent-dashboard')} className="flex items-center text-xs font-bold uppercase tracking-widest text-red-600 mb-8"><ArrowLeft size={16} className="mr-2" /> Back</button>
           <div className="aspect-video w-full rounded-3xl overflow-hidden border dark:border-gray-800 shadow-2xl">
              <iframe src="https://lookerstudio.google.com/embed/reporting/01d55067-0527-435e-9e17-5a692003f0b0/page/N7h0D" className="w-full h-full" title="Medical Report" />
           </div>
         </div>
       )}
-      {currentPage.startsWith('service-') && currentPage !== 'service-medical' && ServiceDetailPage(currentPage)}
 
-      <footer className={`py-12 mt-20 border-t ${darkMode ? 'bg-black text-white/10 border-gray-800' : 'bg-gray-50 text-gray-400 border-gray-100'}`}>
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-[10px] uppercase tracking-[0.3em]">© {new Date().getFullYear()} Pyramids Express Quality App</p>
+      {currentPage.startsWith('service-') && currentPage !== 'service-medical' && (
+        <div className="mt-24 max-w-4xl mx-auto px-4 pb-20 animate-in fade-in duration-500">
+          <button onClick={() => setCurrentPage('agent-dashboard')} className="flex items-center text-xs font-bold uppercase tracking-widest text-red-600 mb-8"><ArrowLeft size={16} className="mr-2" /> Back</button>
+          <h1 className="text-4xl font-black uppercase tracking-tighter mb-12">{currentPage.replace('service-', '').replace('-', ' ')} <span className="text-red-600">Resources</span></h1>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {materials[currentPage.replace('service-', '')]?.map(item => (
+              <div key={item.id} onClick={() => setActiveViewer(item)} className={`p-6 text-left rounded-xl border font-bold uppercase text-xs flex justify-between items-center cursor-pointer transition-all ${darkMode ? 'bg-gray-900 border-gray-800 hover:bg-gray-800' : 'bg-white border-gray-100 hover:shadow-lg'}`}>
+                <div><p className="mb-1">{item.title}</p><p className="text-[9px] font-normal opacity-40 lowercase">{item.desc}</p></div>
+                <div className="text-red-600">{item.type === 'video' ? <Video size={18} /> : item.type === 'pdf' ? <FileText size={18} /> : <ImageIcon size={18} />}</div>
+              </div>
+            ))}
+          </div>
         </div>
-      </footer>
+      )}
 
       {showAuth && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center px-4">
           <div className="absolute inset-0 bg-black/95 backdrop-blur-sm" onClick={() => setShowAuth(false)}></div>
           <div className={`relative w-full max-w-sm p-8 rounded-3xl shadow-2xl transition-all ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
-            <h2 className="text-xl font-black uppercase text-center mb-6 dark:text-white">Security Login</h2>
+            <h2 className="text-xl font-black uppercase text-center mb-6">Security Login</h2>
             <form onSubmit={handleLogin} className="space-y-4">
               <input type="email" placeholder="EMAIL" className={`w-full p-4 rounded-xl border text-xs font-bold uppercase ${darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-100'}`} required />
               <input type="password" placeholder="PASSWORD" className={`w-full p-4 rounded-xl border text-xs font-bold uppercase ${darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-100'}`} required />
-              <button type="submit" className="w-full py-4 bg-red-600 text-white rounded-xl font-black uppercase text-xs tracking-widest hover:bg-red-700">Authorize Access</button>
+              <button type="submit" className="w-full py-4 bg-red-600 text-white rounded-xl font-black uppercase text-xs tracking-widest">Authorize</button>
             </form>
-            <button onClick={() => setShowAuth(false)} className="absolute top-6 right-6 opacity-30 hover:opacity-100 dark:text-white"><X size={20} /></button>
+            <button onClick={() => setShowAuth(false)} className="absolute top-6 right-6 opacity-30 hover:opacity-100"><X size={20} /></button>
           </div>
         </div>
       )}
