@@ -95,7 +95,7 @@
                     <i data-lucide="map-pin" class="w-5 h-5"></i>
                 </a>
             </div>
-            <p class="text-[10px] uppercase tracking-[0.3em] text-gray-400">© <span id="year"></span> Made with love for Pe Agents</p>
+            <p class="text-[10px] uppercase tracking-[0.3em] text-gray-400">© <span id="year"></span> Pyramids Express Quality App</p>
         </div>
     </footer>
 
@@ -162,7 +162,6 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Access global variables provided by environment if they were set, or use defaults
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
             apiKey: "AIzaSyD-1puhqN-3YUCx4PU2d0_Umb06g6Kacco",
             authDomain: "pyramids-express-52a27.firebaseapp.com",
@@ -575,6 +574,25 @@
             }
         };
 
+        async function notifyAdminOfSignup(requestData) {
+            const adminEmail = "ahmedsharaf.pe@gmail.com";
+            try {
+                // Public notification collection so admin can see it in Management Hub
+                const notifId = Date.now().toString();
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notifications', notifId), {
+                    to: adminEmail,
+                    type: 'signup_request',
+                    agentName: requestData.agentName,
+                    agentEmail: requestData.email,
+                    shopName: requestData.shopName,
+                    areaManager: requestData.areaManager,
+                    timestamp: new Date().toISOString()
+                });
+            } catch (e) {
+                console.error("Notification failed", e);
+            }
+        }
+
         window.handleSignUp = async (e) => {
             e.preventDefault();
             const btn = document.getElementById('signup-submit-btn');
@@ -583,20 +601,40 @@
             const pass = document.getElementById('signup-pass').value;
             const area = document.getElementById('signup-area').value;
             const shop = document.getElementById('signup-shop').value;
+            
             btn.disabled = true;
-            btn.innerHTML = 'Submitting...';
+            btn.innerHTML = 'Establishing Session...';
+            
             try {
+                // RULE 3 - Ensure Auth before write
+                if (!auth.currentUser) {
+                    await signInAnonymously(auth);
+                }
+                
+                btn.innerHTML = 'Submitting Data...';
                 const requestId = Date.now().toString();
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', requestId), {
-                    agentName: name, email, password: pass, areaManager: area, shopName: shop,
-                    status: 'pending', createdAt: new Date().toISOString()
-                });
-                alert("Application submitted! Wait for Admin approval.");
+                const reqObj = {
+                    agentName: name, 
+                    email: email, 
+                    password: pass, 
+                    areaManager: area, 
+                    shopName: shop,
+                    status: 'pending', 
+                    createdAt: new Date().toISOString()
+                };
+
+                // Path as per RULE 1
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', requestId), reqObj);
+                
+                // Trigger Simulated Email Notification
+                await notifyAdminOfSignup(reqObj);
+
+                alert("Application submitted! Wait for Admin approval. Notification sent to ahmedsharaf.pe@gmail.com");
                 toggleAuthView('login');
                 e.target.reset();
             } catch (err) {
                 console.error("Sign up error:", err);
-                alert("Submission failed.");
+                alert("Submission failed. Error: " + err.message);
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = 'Submit Application';
@@ -663,6 +701,7 @@
                 const userId = Date.now().toString();
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userId), {
                     email: request.email,
+                    password: request.password || "reset-needed",
                     agentName: request.agentName,
                     areaManager: request.areaManager,
                     shopName: request.shopName,
