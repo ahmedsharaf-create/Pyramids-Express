@@ -90,12 +90,24 @@
         import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Configuration ---
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        // --- Safe Configuration for Deployment ---
+        let firebaseConfig = {};
+        try {
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                firebaseConfig = JSON.parse(__firebase_config);
+            }
+        } catch (e) {
+            console.warn("Firebase config not found. Running in offline mode.");
+        }
+
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        let app, auth, db;
+
+        if (firebaseConfig.apiKey) {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+        }
 
         // --- Global State ---
         window.state = {
@@ -113,6 +125,7 @@
 
         // --- Auth Initialization ---
         async function initAuth() {
+            if (!auth) return;
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
@@ -124,23 +137,25 @@
             }
         }
 
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                const isAdmin = user.email === 'admin@pyramidsexpress.com';
-                window.state.user = { uid: user.uid, email: user.email, name: isAdmin ? 'System Admin' : 'PE Agent' };
-                window.state.isLoggedIn = !!user.email;
-                window.state.isAdmin = isAdmin;
-                setupDataSync();
-            } else {
-                window.state.user = null;
-                window.state.isLoggedIn = false;
-                window.state.isAdmin = false;
-            }
-            render();
-        });
+        if (auth) {
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    const isAdmin = user.email === 'admin@pyramidsexpress.com';
+                    window.state.user = { uid: user.uid, email: user.email, name: isAdmin ? 'System Admin' : 'PE Agent' };
+                    window.state.isLoggedIn = !!user.email;
+                    window.state.isAdmin = isAdmin;
+                    setupDataSync();
+                } else {
+                    window.state.user = null;
+                    window.state.isLoggedIn = false;
+                    window.state.isAdmin = false;
+                }
+                render();
+            });
+        }
 
         function setupDataSync() {
-            if (!auth.currentUser) return;
+            if (!auth || !auth.currentUser || !db) return;
             const publicDataRef = collection(db, 'artifacts', appId, 'public', 'data', 'materials');
             onSnapshot(publicDataRef, (snapshot) => {
                 const newMaterials = {
@@ -159,6 +174,7 @@
             }, (err) => console.error("Firestore error:", err));
         }
 
+        // --- UI Logic Exported to Global ---
         window.handleLogin = async (e) => {
             e.preventDefault();
             const email = document.getElementById('login-email').value;
@@ -179,7 +195,7 @@
 
         window.handleAdminUpload = async (e) => {
             e.preventDefault();
-            if (!window.state.isAdmin) return;
+            if (!window.state.isAdmin || !db) return;
             const cat = document.getElementById('adm-cat').value;
             const title = document.getElementById('adm-title').value;
             const desc = document.getElementById('adm-desc').value;
@@ -201,7 +217,7 @@
         };
 
         window.handleDeleteMaterial = async (id) => {
-            if (!window.state.isAdmin) return;
+            if (!window.state.isAdmin || !db) return;
             const materialRef = doc(db, 'artifacts', appId, 'public', 'data', 'materials', id);
             try {
                 await deleteDoc(materialRef);
@@ -236,9 +252,11 @@
             modal.style.display = show ? 'flex' : 'none';
         };
 
+        // --- Render Engine ---
         function render() {
             const root = document.getElementById('app-root');
             const navLinks = document.getElementById('nav-links');
+            if (!root) return;
             const s = window.state;
             
             let navHtml = `<button onclick="navigateTo('home')" class="text-xs uppercase font-bold tracking-widest opacity-60 hover:text-red-600 transition-colors">Home</button>`;
