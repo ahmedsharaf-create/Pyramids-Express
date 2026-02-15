@@ -905,12 +905,41 @@
             </div>`;
         }
 
+        function renderMedicalPortal() {
+            return `<div class="max-w-7xl mx-auto px-4 py-12 fade-in">
+                <button onclick="navigateTo('agent-dashboard')" class="flex items-center text-xs font-bold uppercase tracking-widest text-red-600 mb-8 hover:opacity-70">
+                    <i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i> Back to Dashboard
+                </button>
+                <h1 class="text-4xl font-black uppercase tracking-tighter mb-8 dark:text-white">Medical <span class="text-red-600">Insurance</span> Portal</h1>
+                
+                <!-- Looker Studio Embed -->
+                <div class="mb-12">
+                    <div class="iframe-container shadow-2xl border dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+                        <iframe src="https://lookerstudio.google.com/embed/reporting/01d55067-0527-435e-9e17-5a692003f0b0/page/N7h0D" frameborder="0" style="border:0" allowfullscreen sandbox="allow-storage-access-by-user-activation allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+                    </div>
+                </div>
+
+                <!-- Related Documents Section -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    ${(window.state.materials['medical'] || []).map(i => `
+                        <div onclick='openViewer(${JSON.stringify(i).replace(/'/g, "&apos;")})' class="p-6 rounded-xl border ${window.state.darkMode ? 'bg-gray-900 border-gray-800 hover:bg-gray-800' : 'bg-white border-gray-100 hover:shadow-lg'} transition-all flex justify-between items-center group cursor-pointer">
+                            <div>
+                                <p class="text-xs font-bold uppercase tracking-widest mb-1 dark:text-white">${i.title}</p>
+                                <p class="text-[9px] font-medium opacity-40 uppercase tracking-tighter dark:text-gray-500">Preview Data</p>
+                            </div>
+                            <div class="text-red-600 group-hover:scale-110 transition-transform">
+                                <i data-lucide="${i.type === 'pdf' ? 'file-text' : i.type === 'video' ? 'video' : 'image'}" class="w-5 h-5"></i>
+                            </div>
+                        </div>`).join('')}
+                </div>
+            </div>`;
+        }
+
         function renderAdmin() {
             const s = window.state;
             const requests = s.requests;
             const allMaterials = Object.values(s.materials).flat();
 
-            // Filter users based on state filters
             const filteredUsers = s.users.filter(u => {
                 const matchesSearch = !s.adminFilters.search || 
                     u.agentName.toLowerCase().includes(s.adminFilters.search) || 
@@ -920,7 +949,6 @@
                 return matchesSearch && matchesArea && matchesShop;
             });
 
-            // Calculate Analytics based on FILTERED users
             const managerStats = filteredUsers.reduce((acc, u) => {
                 acc[u.areaManager] = (acc[u.areaManager] || 0) + 1;
                 return acc;
@@ -940,11 +968,11 @@
 
                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
                     <div class="lg:col-span-1 space-y-6">
-                         <!-- Resource Upload -->
                          <div class="p-6 rounded-2xl border ${s.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
                             <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white">Direct File Upload</h3>
                             <form onsubmit="handleAdminUpload(event)" class="space-y-3">
                                 <select id="adm-cat" class="w-full p-2.5 rounded-xl border text-[10px] font-bold uppercase dark:bg-gray-800 dark:border-gray-700 dark:text-white">
+                                    <option value="medical">Medical Insurance</option>
                                     <option value="orange-info">Orange Info</option>
                                     <option value="corporate">Corporate</option>
                                     <option value="incentives">Incentives</option>
@@ -970,7 +998,6 @@
                             </form>
                          </div>
 
-                         <!-- Create Agent -->
                          <div class="p-6 rounded-2xl border ${s.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
                             <h3 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white text-blue-600">Create Agent Account</h3>
                             <form onsubmit="handleAdminCreateUser(event)" class="space-y-3">
@@ -989,7 +1016,6 @@
                     </div>
 
                     <div class="lg:col-span-3 space-y-8">
-                        <!-- Dashboard Analytics & Filtering -->
                         <div class="p-8 rounded-3xl border ${s.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
                             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                                 <h4 class="font-black uppercase tracking-widest text-[10px] dark:text-white flex items-center"><i data-lucide="bar-chart-2" class="w-4 h-4 mr-2 text-red-600"></i> Live User Distribution</h4>
@@ -1033,7 +1059,6 @@
                             </div>
                         </div>
 
-                        <!-- Pending Applications -->
                         ${requests.length > 0 ? `
                         <div class="p-6 rounded-3xl border-2 border-red-600 ${s.darkMode ? 'bg-red-950/10' : 'bg-red-50'}">
                             <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 flex justify-between text-red-600">Pending Applications <span class="bg-red-600 text-white px-2 rounded-full">${requests.length}</span></h4>
@@ -1053,7 +1078,6 @@
                             </div>
                         </div>` : ''}
 
-                        <!-- Agent Directory (Filtered) -->
                         <div class="p-6 rounded-3xl border ${s.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
                             <h4 class="font-black uppercase tracking-widest text-[10px] mb-4 dark:text-white">Agent Directory <span class="text-red-600 font-black ml-2">${filteredUsers.length} Found</span></h4>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1072,7 +1096,6 @@
                             </div>
                         </div>
 
-                        <!-- Resource Inventory -->
                         <div class="p-6 rounded-3xl border ${s.darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}">
                             <h4 class="font-black uppercase tracking-widest text-[10px] mb-6 dark:text-white">Platform Resources</h4>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -1099,7 +1122,8 @@
             const s = window.state;
             const items = s.materials[catId] || [];
             
-            // Special rendering for heroes/events
+            // Special rendering for heroes/events/medical
+            if (catId === 'medical') return renderMedicalPortal();
             if (catId === 'heroes') return renderHeroesPortal();
             if (catId === 'events') return renderEventsPortal();
 
