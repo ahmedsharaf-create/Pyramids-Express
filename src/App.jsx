@@ -1,30 +1,25 @@
 import React, { useState, useEffect } from 'react'
-import {
-  onAuthStateChanged, signInAnonymously, signOut,
-} from 'firebase/auth'
-import {
-  collection, onSnapshot,
-} from 'firebase/firestore'
+import { onAuthStateChanged, signInAnonymously, signOut } from 'firebase/auth'
+import { collection, onSnapshot } from 'firebase/firestore'
 import { auth, db, APP_ID } from './firebase.js'
 import { Icon, Btn, Toast } from './ui.jsx'
 import AuthModal from './AuthModal.jsx'
 import MediaViewer from './MediaViewer.jsx'
 import AdminPage from './AdminPage.jsx'
 import {
-  HomePage, DashboardPage, MaterialsPage, HeroesPage, EventsPage,
+  HomePage, DashboardPage, MaterialsPage,
+  HeroesPage, EventsPage, ActivitiesPage,
 } from './Pages.jsx'
 
 const ff = "'Barlow Condensed', sans-serif"
 
-// ─── Initial empty state ──────────────────────────────────────────────────────
 const INITIAL_STATE = {
-  isLoggedIn: false,
-  isAdmin:    false,
-  user:       null,
-  materials:  { 'orange-info': [], corporate: [], incentives: [], heroes: [], events: [], medical: [] },
-  users:      [],
-  shops:      [],      // <-- loaded from Firestore, managed by admin
-  requests:   [],
+  isLoggedIn: false, isAdmin: false, user: null,
+  materials: {
+    'orange-info': [], corporate: [], incentives: [],
+    heroes: [], events: [], medical: [], activities: [],
+  },
+  users: [], shops: [], requests: [],
 }
 
 export default function App() {
@@ -35,9 +30,7 @@ export default function App() {
   const [toast,    setToast]    = useState(null)
   const [appState, setAppState] = useState(INITIAL_STATE)
 
-  // ── Firebase listeners ───────────────────────────────────────────────────
   useEffect(() => {
-    // Sign in anonymously so Firestore rules (allow read to all) work
     signInAnonymously(auth).catch(() => {})
 
     const unsubAuth = onAuthStateChanged(auth, user => {
@@ -52,17 +45,21 @@ export default function App() {
       }
     })
 
-    // Materials
     const unsubMat = onSnapshot(
       collection(db, 'artifacts', APP_ID, 'public', 'data', 'materials'),
       snap => {
-        const m = { 'orange-info': [], corporate: [], incentives: [], heroes: [], events: [], medical: [] }
-        snap.forEach(d => { const data = d.data(); if (m[data.category]) m[data.category].push({ id: d.id, ...data }) })
+        const m = {
+          'orange-info': [], corporate: [], incentives: [],
+          heroes: [], events: [], medical: [], activities: [],
+        }
+        snap.forEach(d => {
+          const data = d.data()
+          if (m[data.category]) m[data.category].push({ id: d.id, ...data })
+        })
         setAppState(s => ({ ...s, materials: m }))
       }
     )
 
-    // Users
     const unsubUsers = onSnapshot(
       collection(db, 'artifacts', APP_ID, 'public', 'data', 'users'),
       snap => {
@@ -71,7 +68,6 @@ export default function App() {
       }
     )
 
-    // Shops (managed by admin in Firestore)
     const unsubShops = onSnapshot(
       collection(db, 'artifacts', APP_ID, 'public', 'data', 'shops'),
       snap => {
@@ -80,7 +76,6 @@ export default function App() {
       }
     )
 
-    // Requests
     const unsubReqs = onSnapshot(
       collection(db, 'artifacts', APP_ID, 'public', 'data', 'requests'),
       snap => {
@@ -92,31 +87,28 @@ export default function App() {
     return () => { unsubAuth(); unsubMat(); unsubUsers(); unsubShops(); unsubReqs() }
   }, [])
 
-  const handleLogout = async () => {
-    await signOut(auth)
-    setPage('home')
-  }
+  const handleLogout = async () => { await signOut(auth); setPage('home') }
 
-  // ── Colours ──────────────────────────────────────────────────────────────
-  const bg   = dark ? '#0a0a0a' : '#fafafa'
-  const text = dark ? '#fff'    : '#111'
+  const bg     = dark ? '#0a0a0a' : '#fafafa'
+  const text   = dark ? '#fff'    : '#111'
   const border = dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'
+
+  const authRequired = [
+    'dashboard', 'admin',
+    'orange-info', 'corporate', 'incentives', 'medical', 'activities',
+  ]
 
   return (
     <div style={{ minHeight: '100vh', background: bg, color: text, transition: 'background 0.3s, color 0.3s' }}>
 
-      {/* ─── Navbar ────────────────────────────────────────────────────────── */}
+      {/* ─── Navbar ── */}
       <nav style={{
-        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
-        height: 60, background: dark ? 'rgba(10,10,10,0.96)' : 'rgba(250,250,250,0.96)',
-        backdropFilter: 'blur(14px)',
-        borderBottom: `1px solid ${border}`,
+        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, height: 60,
+        background: dark ? 'rgba(10,10,10,0.96)' : 'rgba(250,250,250,0.96)',
+        backdropFilter: 'blur(14px)', borderBottom: `1px solid ${border}`,
         display: 'flex', alignItems: 'center',
       }}>
-        <div style={{
-          maxWidth: 1280, margin: '0 auto', padding: '0 20px',
-          width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 20px', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           {/* Brand */}
           <button onClick={() => setPage('home')} style={{
             background: 'none', border: 'none', cursor: 'pointer',
@@ -128,17 +120,15 @@ export default function App() {
             Pyramids Express
           </button>
 
-          {/* Desktop links */}
+          {/* Links */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
             <button onClick={() => setDark(!dark)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: text, opacity: 0.55, padding: 4 }}>
               <Icon name={dark ? 'sun' : 'moon'} size={18} />
             </button>
 
             <NavLink label="Home"      onClick={() => setPage('home')}      dark={dark} />
-
-            {appState.isLoggedIn && (
-              <NavLink label="Dashboard" onClick={() => setPage('dashboard')} dark={dark} />
-            )}
+            {appState.isLoggedIn && <NavLink label="Dashboard" onClick={() => setPage('dashboard')} dark={dark} />}
+            {appState.isLoggedIn && <NavLink label="Activities" onClick={() => setPage('activities')} dark={dark} active={page === 'activities'} />}
 
             {appState.isAdmin && (
               <button onClick={() => setPage('admin')} style={{
@@ -153,7 +143,9 @@ export default function App() {
                     background: '#ef4444', color: '#fff', borderRadius: '50%',
                     width: 17, height: 17, fontSize: 9,
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900,
-                  }}>{appState.requests.length}</span>
+                  }}>
+                    {appState.requests.length}
+                  </span>
                 )}
               </button>
             )}
@@ -168,85 +160,51 @@ export default function App() {
                 </button>
               </div>
             ) : (
-              <Btn onClick={() => setAuthOpen(true)} color={dark ? 'red' : 'black'} small>
-                Agent Login
-              </Btn>
+              <Btn onClick={() => setAuthOpen(true)} color={dark ? 'red' : 'black'} small>Agent Login</Btn>
             )}
           </div>
         </div>
       </nav>
 
-      {/* ─── Main content ──────────────────────────────────────────────────── */}
+      {/* ─── Main ── */}
       <main style={{ paddingTop: 60 }}>
-        {page === 'home' && (
-          <HomePage
-            dark={dark}
-            isLoggedIn={appState.isLoggedIn}
-            onLogin={() => setAuthOpen(true)}
-            onNavigate={setPage}
-          />
-        )}
-
-        {page === 'dashboard' && appState.isLoggedIn && (
-          <DashboardPage dark={dark} onNavigate={setPage} />
-        )}
-
-        {page === 'admin' && appState.isAdmin && (
-          <AdminPage
-            dark={dark}
-            state={appState}
-            onView={setViewer}
-            setToast={setToast}
-          />
-        )}
-
-        {['orange-info', 'corporate', 'incentives', 'medical'].includes(page) && (
-          <MaterialsPage
-            dark={dark}
-            category={page}
-            materials={appState.materials}
-            onBack={() => setPage('dashboard')}
-            onView={setViewer}
-          />
-        )}
-
-        {page === 'heroes' && (
-          <HeroesPage
-            dark={dark}
-            materials={appState.materials}
-            onBack={() => setPage('home')}
-            onView={setViewer}
-          />
-        )}
-
-        {page === 'events' && (
-          <EventsPage
-            dark={dark}
-            materials={appState.materials}
-            onBack={() => setPage('home')}
-            onView={setViewer}
-          />
-        )}
-
-        {/* Fallback: redirect to home if page requires auth and user is not logged in */}
-        {(page === 'dashboard' || page === 'admin') && !appState.isLoggedIn && (
+        {/* Auth gate */}
+        {authRequired.includes(page) && !appState.isLoggedIn ? (
           <div style={{ textAlign: 'center', padding: '120px 20px' }}>
-            <p style={{ fontFamily: ff, fontWeight: 700, fontSize: 14, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(128,128,128,0.4)' }}>
+            <p style={{ fontFamily: ff, fontWeight: 700, fontSize: 14, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(128,128,128,0.4)', marginBottom: 20 }}>
               Please log in to access this page.
             </p>
-            <div style={{ marginTop: 20 }}>
-              <Btn onClick={() => setAuthOpen(true)} color="red">Agent Login</Btn>
-            </div>
+            <Btn onClick={() => setAuthOpen(true)} color="red">Agent Login</Btn>
           </div>
+        ) : (
+          <>
+            {page === 'home' && (
+              <HomePage dark={dark} isLoggedIn={appState.isLoggedIn} onLogin={() => setAuthOpen(true)} onNavigate={setPage} />
+            )}
+            {page === 'dashboard' && (
+              <DashboardPage dark={dark} onNavigate={setPage} />
+            )}
+            {page === 'admin' && appState.isAdmin && (
+              <AdminPage dark={dark} state={appState} onView={setViewer} setToast={setToast} />
+            )}
+            {page === 'activities' && (
+              <ActivitiesPage dark={dark} materials={appState.materials} onBack={() => setPage('dashboard')} onView={setViewer} />
+            )}
+            {['orange-info', 'corporate', 'incentives', 'medical'].includes(page) && (
+              <MaterialsPage dark={dark} category={page} materials={appState.materials} onBack={() => setPage('dashboard')} onView={setViewer} />
+            )}
+            {page === 'heroes' && (
+              <HeroesPage dark={dark} materials={appState.materials} onBack={() => setPage('home')} onView={setViewer} />
+            )}
+            {page === 'events' && (
+              <EventsPage dark={dark} materials={appState.materials} onBack={() => setPage('home')} onView={setViewer} />
+            )}
+          </>
         )}
       </main>
 
-      {/* ─── Footer ───────────────────────────────────────────────────────── */}
-      <footer style={{
-        marginTop: 80, padding: '48px 20px', textAlign: 'center',
-        borderTop: `1px solid ${border}`,
-        background: dark ? '#050505' : '#f2f2f2',
-      }}>
+      {/* ─── Footer ── */}
+      <footer style={{ marginTop: 80, padding: '48px 20px', textAlign: 'center', borderTop: `1px solid ${border}`, background: dark ? '#050505' : '#f2f2f2' }}>
         <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginBottom: 22 }}>
           {[
             { icon: 'linkedin', href: 'https://www.linkedin.com/company/pyramids-express-orange' },
@@ -267,34 +225,26 @@ export default function App() {
         </p>
       </footer>
 
-      {/* ─── Modals ───────────────────────────────────────────────────────── */}
       {authOpen && (
-        <AuthModal
-          dark={dark}
-          shops={appState.shops}
-          onClose={() => setAuthOpen(false)}
-          onLoginSuccess={() => setPage('dashboard')}
-        />
+        <AuthModal dark={dark} shops={appState.shops} onClose={() => setAuthOpen(false)} onLoginSuccess={() => setPage('dashboard')} />
       )}
-
-      {viewer  && <MediaViewer material={viewer}  onClose={() => setViewer(null)} />}
-      {toast   && <Toast {...toast} onClose={() => setToast(null)} />}
+      {viewer && <MediaViewer material={viewer} onClose={() => setViewer(null)} />}
+      {toast  && <Toast {...toast} onClose={() => setToast(null)} />}
     </div>
   )
 }
 
-// ─── NavLink helper ───────────────────────────────────────────────────────────
-function NavLink({ label, onClick, dark }) {
+function NavLink({ label, onClick, dark, active }) {
   return (
     <button onClick={onClick} style={{
       background: 'none', border: 'none', cursor: 'pointer',
       fontFamily: ff, fontWeight: 700, fontSize: 12,
       letterSpacing: '0.15em', textTransform: 'uppercase',
-      color: dark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)',
+      color: active ? '#ef4444' : (dark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)'),
       transition: 'color 0.2s',
     }}
       onMouseEnter={e => e.target.style.color = '#ef4444'}
-      onMouseLeave={e => e.target.style.color = dark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)'}
+      onMouseLeave={e => { if (!active) e.target.style.color = dark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }}
     >
       {label}
     </button>
