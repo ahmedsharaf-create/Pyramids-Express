@@ -222,7 +222,7 @@ export default function AdminPage({ dark, state, onView, setToast }) {
             <SectionHead dark={dark}>Upload Resource</SectionHead>
             <form onSubmit={handleUpload} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <Select value={uploadForm.cat} onChange={e => setUploadForm({ ...uploadForm, cat: e.target.value })} dark={dark}>
-                {['medical','orange-info','corporate','incentives','heroes','events'].map(c =>
+                {['medical','orange-info','corporate','incentives','heroes','events','activities'].map(c =>
                   <option key={c} value={c}>{c.replace(/-/g,' ').toUpperCase()}</option>
                 )}
               </Select>
