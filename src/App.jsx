@@ -116,7 +116,9 @@ export default function App() {
             textTransform: 'uppercase', color: text,
             display: 'flex', alignItems: 'center', gap: 10,
           }}>
-            <span style={{ background: '#ef4444', color: '#fff', padding: '2px 8px', borderRadius: 5, fontSize: 14 }}>Logo.png</span>
+            <span style={{ background: '#ef4444', color: '#fff', padding: '2px 8px', borderRadius: 5, fontSize: 14 }}
+              link rel="icon" type="image/svg+xml" href="/Logo.png" />
+            </span>
             Pyramids Express
           </button>
 
