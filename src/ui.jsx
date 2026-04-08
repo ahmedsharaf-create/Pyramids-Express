@@ -34,6 +34,10 @@ const PATHS = {
   store:      "M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2zM9 22V12h6v10",
   users:      "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 100 8 4 4 0 000-8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75",
   warning:    "M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01",
+  archive:    "M21 8a2 2 0 00-2-2H5a2 2 0 00-2 2v2h18V8zM3 12v7a2 2 0 002 2h14a2 2 0 002-2v-7H3zM9 16h6",
+  activity:   "M22 12h-4l-3 9L9 3l-3 9H2",
+  calendar:   "M3 9h18M3 5h18a2 2 0 012 2v14a2 2 0 01-2 2H3a2 2 0 01-2-2V7a2 2 0 012-2zM8 3v4M16 3v4",
+  trendUp:    "M23 6l-9.5 9.5-5-5L1 18M17 6h6v6",
 }
 
 export function Icon({ name, size = 20, className = '', style = {} }) {
