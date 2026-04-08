@@ -1,7 +1,6 @@
 import React from 'react'
 import { Icon, Btn } from './ui.jsx'
 
-// ─── Shared styles ────────────────────────────────────────────────────────────
 const ff = "'Barlow Condensed', sans-serif"
 
 const emptyBox = (dark, text) => (
@@ -62,9 +61,7 @@ export function HomePage({ dark, isLoggedIn, onLogin, onNavigate }) {
               <Icon name="camera" size={16} /> Pyramids Events
             </Btn>
             {!isLoggedIn && (
-              <Btn onClick={onLogin} color="red">
-                Agent Portal
-              </Btn>
+              <Btn onClick={onLogin} color="red">Agent Portal</Btn>
             )}
           </div>
         </div>
@@ -76,17 +73,16 @@ export function HomePage({ dark, isLoggedIn, onLogin, onNavigate }) {
 // ─── Dashboard Page ───────────────────────────────────────────────────────────
 export function DashboardPage({ dark, onNavigate }) {
   const cards = [
-    { id: 'medical',    title: 'Medical Insurance', sub: 'Omega Care Network', icon: 'heart' },
-    { id: 'orange-info', title: 'Orange Info',      sub: 'Sales & Tariffs',    icon: 'globe' },
-    { id: 'corporate',  title: 'Corporate Materials', sub: 'Solutions',        icon: 'briefcase' },
-    { id: 'incentives', title: 'Incentives',         sub: 'Rewards & Recognition', icon: 'award' },
+    { id: 'medical',     title: 'Medical Insurance',   sub: 'Omega Care Network',    icon: 'heart' },
+    { id: 'orange-info', title: 'Orange Info',         sub: 'Sales & Tariffs',       icon: 'globe' },
+    { id: 'corporate',   title: 'Corporate Materials', sub: 'Solutions',             icon: 'briefcase' },
+    { id: 'incentives',  title: 'Incentives',          sub: 'Rewards & Recognition', icon: 'award' },
   ]
+
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: '48px 20px', animation: 'fadeUp 0.4s ease' }}>
-      <div style={{
-        marginBottom: 48, paddingBottom: 32,
-        borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
-      }}>
+      {/* Header */}
+      <div style={{ marginBottom: 48, paddingBottom: 32, borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>
         <h2 style={{ fontFamily: ff, fontWeight: 900, fontSize: 40, textTransform: 'uppercase', letterSpacing: '-0.02em', margin: 0, color: dark ? '#fff' : '#111' }}>
           Agent Dashboard
         </h2>
@@ -94,7 +90,9 @@ export function DashboardPage({ dark, onNavigate }) {
           Authorized Access Only
         </p>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 20 }}>
+
+      {/* ── Portal cards ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 20, marginBottom: 40 }}>
         {cards.map(c => (
           <div
             key={c.id} onClick={() => onNavigate(c.id)}
@@ -135,14 +133,220 @@ export function DashboardPage({ dark, onNavigate }) {
           </div>
         ))}
       </div>
+
+      {/* ── Activities Section ── */}
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div>
+            <h3 style={{ fontFamily: ff, fontWeight: 900, fontSize: 28, textTransform: 'uppercase', letterSpacing: '-0.01em', margin: 0, color: dark ? '#fff' : '#111' }}>
+              Activities
+            </h3>
+            <p style={{ fontFamily: ff, fontWeight: 600, fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(128,128,128,0.55)', marginTop: 4 }}>
+              Latest updates &amp; field activities
+            </p>
+          </div>
+          <button onClick={() => onNavigate('activities')} style={{
+            background: 'none', border: `1px solid ${dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)'}`,
+            borderRadius: 9, padding: '8px 16px', cursor: 'pointer',
+            fontFamily: ff, fontWeight: 700, fontSize: 11, letterSpacing: '0.15em',
+            textTransform: 'uppercase', color: dark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s',
+          }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = '#ef4444'; e.currentTarget.style.color = '#ef4444' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)'; e.currentTarget.style.color = dark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)' }}
+          >
+            View All <Icon name="chevRight" size={14} />
+          </button>
+        </div>
+
+        {/* Activities preview strip — placeholder if not passed, parent passes items */}
+        <ActivitiesPreview dark={dark} onNavigate={onNavigate} />
+      </div>
+    </div>
+  )
+}
+
+// ── Activities preview (shows "go to activities" CTA card) ───────────────────
+function ActivitiesPreview({ dark, onNavigate }) {
+  return (
+    <div
+      onClick={() => onNavigate('activities')}
+      style={{
+        borderRadius: 16, overflow: 'hidden', cursor: 'pointer',
+        background: dark
+          ? 'linear-gradient(120deg,#0e0e0e 0%,#1a1a1a 100%)'
+          : 'linear-gradient(120deg,#f8f8f8 0%,#f0f0f0 100%)',
+        border: `1px solid ${dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'}`,
+        padding: '32px 28px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20,
+        transition: 'all 0.2s',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = '#ef4444'; e.currentTarget.style.boxShadow = '0 8px 32px rgba(239,68,68,0.12)' }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'; e.currentTarget.style.boxShadow = '' }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+        <div style={{
+          width: 56, height: 56, borderRadius: 14,
+          background: dark ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.08)',
+          border: `1px solid rgba(239,68,68,0.25)`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          color: '#ef4444',
+        }}>
+          <Icon name="activity" size={28} />
+        </div>
+        <div>
+          <p style={{ fontFamily: ff, fontWeight: 900, fontSize: 18, textTransform: 'uppercase', letterSpacing: '0.04em', margin: 0, color: dark ? '#fff' : '#111' }}>
+            Activities Board
+          </p>
+          <p style={{ fontFamily: ff, fontWeight: 600, fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(128,128,128,0.55)', marginTop: 4 }}>
+            Field reports, team photos &amp; announcements
+          </p>
+        </div>
+      </div>
+      <div style={{ color: '#ef4444', flexShrink: 0 }}>
+        <Icon name="chevRight" size={22} />
+      </div>
+    </div>
+  )
+}
+
+// ─── Activities Page ──────────────────────────────────────────────────────────
+export function ActivitiesPage({ dark, materials, onBack, onView }) {
+  const items = materials['activities'] || []
+
+  return (
+    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '48px 20px', animation: 'fadeUp 0.4s ease' }}>
+      <button onClick={onBack} style={{
+        background: 'none', border: 'none', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', gap: 8,
+        fontFamily: ff, fontWeight: 700, fontSize: 12, letterSpacing: '0.15em',
+        textTransform: 'uppercase', color: '#ef4444', marginBottom: 32,
+      }}>
+        <Icon name="arrowLeft" size={16} /> Back to Dashboard
+      </button>
+
+      <div style={{ marginBottom: 48, paddingBottom: 28, borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>
+        <h1 style={{ fontFamily: ff, fontWeight: 900, fontSize: 40, textTransform: 'uppercase', letterSpacing: '-0.02em', margin: 0, color: dark ? '#fff' : '#111' }}>
+          Team <span style={{ color: '#ef4444' }}>Activities</span>
+        </h1>
+        <p style={{ fontFamily: ff, fontWeight: 600, fontSize: 12, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(128,128,128,0.55)', marginTop: 8 }}>
+          Field reports, team photos &amp; announcements
+        </p>
+      </div>
+
+      {items.length === 0 ? (
+        <div style={{
+          padding: '100px 20px', textAlign: 'center',
+          border: `2px dashed ${dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)'}`,
+          borderRadius: 24,
+          fontFamily: ff, fontWeight: 700, fontSize: 12,
+          letterSpacing: '0.2em', textTransform: 'uppercase',
+          color: 'rgba(128,128,128,0.35)',
+        }}>
+          No activities posted yet
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 24 }}>
+          {items.map(item => (
+            <ActivityCard key={item.id} item={item} dark={dark} onView={onView} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Single activity card ──────────────────────────────────────────────────────
+function ActivityCard({ item, dark, onView }) {
+  const date = item.createdAt
+    ? new Date(item.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    : ''
+
+  return (
+    <div
+      onClick={() => onView(item)}
+      style={{
+        background: dark ? '#111' : '#fff',
+        border: `1px solid ${dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'}`,
+        borderRadius: 18, overflow: 'hidden', cursor: 'pointer',
+        transition: 'all 0.25s',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.transform = 'translateY(-4px)'
+        e.currentTarget.style.boxShadow = '0 16px 48px rgba(0,0,0,0.18)'
+        e.currentTarget.style.borderColor = dark ? 'rgba(239,68,68,0.4)' : 'rgba(239,68,68,0.25)'
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.transform = ''
+        e.currentTarget.style.boxShadow = ''
+        e.currentTarget.style.borderColor = dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'
+      }}
+    >
+      {/* Image */}
+      {item.type === 'photo' && (
+        <div style={{ aspectRatio: '16/10', overflow: 'hidden', background: dark ? '#1a1a1a' : '#f0f0f0' }}>
+          <img
+            src={item.url} alt={item.title}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.4s' }}
+            onMouseEnter={e => e.target.style.transform = 'scale(1.05)'}
+            onMouseLeave={e => e.target.style.transform = ''}
+          />
+        </div>
+      )}
+      {item.type === 'video' && (
+        <div style={{ aspectRatio: '16/10', overflow: 'hidden', background: '#000', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <video src={item.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.3)' }}>
+            <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(255,255,255,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="video" size={20} style={{ color: '#111' }} />
+            </div>
+          </div>
+        </div>
+      )}
+      {item.type === 'pdf' && (
+        <div style={{ aspectRatio: '16/10', background: dark ? '#1a1a1a' : '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center' }}>
+            <Icon name="fileText" size={36} style={{ color: '#ef4444' }} />
+            <p style={{ fontFamily: ff, fontWeight: 700, fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(128,128,128,0.5)', marginTop: 8 }}>PDF Document</p>
+          </div>
+        </div>
+      )}
+
+      {/* Info */}
+      <div style={{ padding: '18px 20px' }}>
+        <h3 style={{
+          fontFamily: ff, fontWeight: 900, fontSize: 17, textTransform: 'uppercase',
+          letterSpacing: '0.04em', margin: 0, color: dark ? '#fff' : '#111',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {item.title}
+        </h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+          {date && (
+            <span style={{ fontFamily: ff, fontWeight: 600, fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(128,128,128,0.5)' }}>
+              {date}
+            </span>
+          )}
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+            borderRadius: 6, padding: '3px 8px',
+            fontFamily: ff, fontWeight: 700, fontSize: 9, letterSpacing: '0.15em',
+            textTransform: 'uppercase', color: '#ef4444',
+          }}>
+            <Icon name={item.type === 'pdf' ? 'fileText' : item.type === 'video' ? 'video' : 'image'} size={10} />
+            {item.type}
+          </span>
+        </div>
+      </div>
     </div>
   )
 }
 
 // ─── Materials Page ───────────────────────────────────────────────────────────
 export function MaterialsPage({ dark, category, materials, onBack, onView }) {
-  const items = materials[category] || []
-  const label = category.replace(/-/g, ' ')
+  const items    = materials[category] || []
+  const label    = category.replace(/-/g, ' ')
   const isMedical = category === 'medical'
 
   return (
@@ -155,17 +359,11 @@ export function MaterialsPage({ dark, category, materials, onBack, onView }) {
       }}>
         <Icon name="arrowLeft" size={16} /> Back to Dashboard
       </button>
-
       <h1 style={{ fontFamily: ff, fontWeight: 900, fontSize: 40, textTransform: 'uppercase', letterSpacing: '-0.02em', margin: '0 0 40px', color: dark ? '#fff' : '#111' }}>
         {label} <span style={{ color: '#ef4444' }}>Portal</span>
       </h1>
-
       {isMedical && (
-        <div style={{
-          marginBottom: 40, borderRadius: 20, overflow: 'hidden',
-          border: `1px solid ${dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'}`,
-          paddingBottom: '56.25%', position: 'relative', height: 0,
-        }}>
+        <div style={{ marginBottom: 40, borderRadius: 20, overflow: 'hidden', border: `1px solid ${dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'}`, paddingBottom: '56.25%', position: 'relative', height: 0 }}>
           <iframe
             src="https://lookerstudio.google.com/embed/reporting/01d55067-0527-435e-9e17-5a692003f0b0/page/N7h0D"
             style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
@@ -174,28 +372,21 @@ export function MaterialsPage({ dark, category, materials, onBack, onView }) {
           />
         </div>
       )}
-
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
         {items.map(item => (
-          <div
-            key={item.id} onClick={() => onView(item)}
-            style={{
-              padding: '20px 24px',
-              background: dark ? '#111' : '#fff',
-              border: `1px solid ${dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'}`,
-              borderRadius: 14, display: 'flex', justifyContent: 'space-between',
-              alignItems: 'center', cursor: 'pointer', transition: 'all 0.2s',
-            }}
+          <div key={item.id} onClick={() => onView(item)} style={{
+            padding: '20px 24px',
+            background: dark ? '#111' : '#fff',
+            border: `1px solid ${dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'}`,
+            borderRadius: 14, display: 'flex', justifyContent: 'space-between',
+            alignItems: 'center', cursor: 'pointer', transition: 'all 0.2s',
+          }}
             onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 8px 28px rgba(0,0,0,0.14)'; e.currentTarget.style.borderColor = dark ? 'rgba(239,68,68,0.4)' : 'rgba(0,0,0,0.18)' }}
             onMouseLeave={e => { e.currentTarget.style.boxShadow = ''; e.currentTarget.style.borderColor = dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)' }}
           >
             <div>
-              <p style={{ fontFamily: ff, fontWeight: 800, fontSize: 14, textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0, color: dark ? '#fff' : '#111' }}>
-                {item.title}
-              </p>
-              <p style={{ fontFamily: ff, fontWeight: 600, fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(128,128,128,0.6)', margin: '4px 0 0' }}>
-                Preview Data
-              </p>
+              <p style={{ fontFamily: ff, fontWeight: 800, fontSize: 14, textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0, color: dark ? '#fff' : '#111' }}>{item.title}</p>
+              <p style={{ fontFamily: ff, fontWeight: 600, fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(128,128,128,0.6)', margin: '4px 0 0' }}>Preview Data</p>
             </div>
             <div style={{ color: '#ef4444' }}>
               <Icon name={item.type === 'pdf' ? 'fileText' : item.type === 'video' ? 'video' : 'image'} size={20} />
@@ -213,18 +404,10 @@ export function HeroesPage({ dark, materials, onBack, onView }) {
   const items = materials['heroes'] || []
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: '48px 20px', animation: 'fadeUp 0.4s ease' }}>
-      <button onClick={onBack} style={{
-        background: 'none', border: 'none', cursor: 'pointer',
-        display: 'flex', alignItems: 'center', gap: 8,
-        fontFamily: ff, fontWeight: 700, fontSize: 12, letterSpacing: '0.15em',
-        textTransform: 'uppercase', color: '#ef4444', marginBottom: 32,
-      }}>
+      <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontFamily: ff, fontWeight: 700, fontSize: 12, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#ef4444', marginBottom: 32 }}>
         <Icon name="arrowLeft" size={16} /> Back Home
       </button>
-      <div style={{
-        marginBottom: 48, paddingBottom: 28,
-        borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
-      }}>
+      <div style={{ marginBottom: 48, paddingBottom: 28, borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>
         <h1 style={{ fontFamily: ff, fontWeight: 900, fontSize: 40, textTransform: 'uppercase', letterSpacing: '-0.02em', margin: 0, color: dark ? '#fff' : '#111' }}>
           Pyramids <span style={{ color: '#ef4444' }}>Heroes</span>
         </h1>
@@ -235,13 +418,7 @@ export function HeroesPage({ dark, materials, onBack, onView }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 28 }}>
         {items.map(item => (
           <div key={item.id} onClick={() => onView(item)} style={{ cursor: 'pointer' }}>
-            <div
-              style={{
-                aspectRatio: '210/297', background: dark ? '#111' : '#f4f4f4',
-                borderRadius: 16, overflow: 'hidden', marginBottom: 12,
-                border: `1px solid ${dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'}`,
-                transition: 'box-shadow 0.25s',
-              }}
+            <div style={{ aspectRatio: '210/297', background: dark ? '#111' : '#f4f4f4', borderRadius: 16, overflow: 'hidden', marginBottom: 12, border: `1px solid ${dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'}`, transition: 'box-shadow 0.25s' }}
               onMouseEnter={e => e.currentTarget.style.boxShadow = '0 20px 48px rgba(0,0,0,0.22)'}
               onMouseLeave={e => e.currentTarget.style.boxShadow = ''}
             >
@@ -262,18 +439,10 @@ export function EventsPage({ dark, materials, onBack, onView }) {
   const items = materials['events'] || []
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: '48px 20px', animation: 'fadeUp 0.4s ease' }}>
-      <button onClick={onBack} style={{
-        background: 'none', border: 'none', cursor: 'pointer',
-        display: 'flex', alignItems: 'center', gap: 8,
-        fontFamily: ff, fontWeight: 700, fontSize: 12, letterSpacing: '0.15em',
-        textTransform: 'uppercase', color: '#ef4444', marginBottom: 32,
-      }}>
+      <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontFamily: ff, fontWeight: 700, fontSize: 12, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#ef4444', marginBottom: 32 }}>
         <Icon name="arrowLeft" size={16} /> Back Home
       </button>
-      <div style={{
-        marginBottom: 48, paddingBottom: 28,
-        borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
-      }}>
+      <div style={{ marginBottom: 48, paddingBottom: 28, borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>
         <h1 style={{ fontFamily: ff, fontWeight: 900, fontSize: 40, textTransform: 'uppercase', letterSpacing: '-0.02em', margin: 0, color: dark ? '#fff' : '#111' }}>
           Pyramids <span style={{ color: '#ef4444' }}>Events</span>
         </h1>
@@ -283,28 +452,13 @@ export function EventsPage({ dark, materials, onBack, onView }) {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
         {items.map(item => (
-          <div
-            key={item.id} onClick={() => onView(item)}
-            style={{
-              position: 'relative', aspectRatio: '16/9', borderRadius: 20,
-              overflow: 'hidden', cursor: 'pointer',
-              border: `1px solid ${dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'}`,
-            }}
-          >
-            <img
-              src={item.url} alt={item.title}
-              style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.4s' }}
+          <div key={item.id} onClick={() => onView(item)} style={{ position: 'relative', aspectRatio: '16/9', borderRadius: 20, overflow: 'hidden', cursor: 'pointer', border: `1px solid ${dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'}` }}>
+            <img src={item.url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.4s' }}
               onMouseEnter={e => e.target.style.transform = 'scale(1.06)'}
               onMouseLeave={e => e.target.style.transform = ''}
             />
-            <div style={{
-              position: 'absolute', inset: 0,
-              background: 'linear-gradient(to top,rgba(0,0,0,0.78) 0%,transparent 60%)',
-              display: 'flex', alignItems: 'flex-end', padding: 20,
-            }}>
-              <p style={{ fontFamily: ff, fontWeight: 800, fontSize: 14, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#fff', margin: 0 }}>
-                {item.title}
-              </p>
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top,rgba(0,0,0,0.78) 0%,transparent 60%)', display: 'flex', alignItems: 'flex-end', padding: 20 }}>
+              <p style={{ fontFamily: ff, fontWeight: 800, fontSize: 14, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#fff', margin: 0 }}>{item.title}</p>
             </div>
           </div>
         ))}
