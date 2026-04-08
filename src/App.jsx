@@ -38,7 +38,7 @@ export default function App() {
         const isAdmin = user.email === 'admin@pyramidsexpress.com'
         setAppState(s => ({
           ...s, isLoggedIn: true, isAdmin,
-          user: { uid: user.uid, email: user.email, name: isAdmin ? 'System Admin' : 'PE Agent' },
+          user: { uid: user.uid, email: user.email, name: isAdmin ? 'System Admin' : 'Pe Agent' },
         }))
       } else {
         setAppState(s => ({ ...s, isLoggedIn: false, isAdmin: false, user: user ? { uid: user.uid } : null }))
