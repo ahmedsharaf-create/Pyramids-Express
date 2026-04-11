@@ -6,6 +6,7 @@ import {
   signInAnonymously, 
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   signOut,
   setPersistence,
   browserLocalPersistence
@@ -31,7 +32,8 @@ import {
   X,
   User,
   Lock,
-  UserPlus
+  UserPlus,
+  Key
 } from 'lucide-react'
 
 // ─── Firebase Configuration ───
@@ -61,13 +63,32 @@ const Icon = ({ name, size = 18, ...props }) => {
     moon: Moon, sun: Sun, logout: LogOut, settings: Settings,
     linkedin: Linkedin, mail: Mail, mapPin: MapPin, 
     back: ChevronLeft, link: ExternalLink, x: X, user: User, lock: Lock,
-    plus: UserPlus
+    plus: UserPlus, key: Key
   }
   const Component = icons[name] || X
   return <Component size={size} {...props} />
 }
 
-const Btn = ({ children, onClick, color = 'red', small, disabled, type = 'button', ...props }) => {
+const Input = ({ dark, ...props }) => (
+  <input
+    {...props}
+    style={{
+      width: '100%',
+      padding: '12px 16px',
+      borderRadius: 10,
+      border: `1px solid ${dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
+      background: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+      color: dark ? '#fff' : '#111',
+      fontFamily: ff,
+      fontWeight: 600,
+      fontSize: 14,
+      outline: 'none',
+      ...props.style
+    }}
+  />
+)
+
+const Btn = ({ children, onClick, color = 'red', small, disabled, type = 'button', full, ...props }) => {
   const bg = color === 'red' ? '#ef4444' : (color === 'black' ? '#111' : '#eee')
   const text = color === 'red' || color === 'black' ? '#fff' : '#111'
   return (
@@ -77,11 +98,12 @@ const Btn = ({ children, onClick, color = 'red', small, disabled, type = 'button
       disabled={disabled}
       style={{
         background: bg, color: text, border: 'none', cursor: 'pointer',
-        padding: small ? '6px 14px' : '10px 24px',
-        borderRadius: 8, fontFamily: ff, fontWeight: 700, fontSize: small ? 12 : 14,
+        padding: small ? '6px 14px' : '12px 24px',
+        borderRadius: 10, fontFamily: ff, fontWeight: 700, fontSize: small ? 12 : 14,
         letterSpacing: '0.05em', textTransform: 'uppercase',
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        gap: 8, transition: 'opacity 0.2s', opacity: disabled ? 0.5 : 1
+        gap: 8, transition: 'opacity 0.2s', opacity: disabled ? 0.5 : 1,
+        width: full ? '100%' : 'auto'
       }}
       onMouseEnter={e => !disabled && (e.currentTarget.style.opacity = 0.8)}
       onMouseLeave={e => !disabled && (e.currentTarget.style.opacity = 1)}
@@ -92,92 +114,306 @@ const Btn = ({ children, onClick, color = 'red', small, disabled, type = 'button
   )
 }
 
-const Toast = ({ msg, type, onClose }) => {
-  useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t) }, [onClose])
+const Toast = ({ message, type, onClose }) => {
+  useEffect(() => { const t = setTimeout(onClose, 4000); return () => clearTimeout(t) }, [onClose])
+  const bg = type === 'error' ? '#ef4444' : (type === 'success' ? '#22c55e' : '#111')
   return (
     <div style={{
       position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
-      background: type === 'error' ? '#ef4444' : '#111', color: '#fff',
-      padding: '12px 24px', borderRadius: 12, zIndex: 1000, fontFamily: ff, fontWeight: 600,
-      boxShadow: '0 10px 30px rgba(0,0,0,0.2)'
+      background: bg, color: '#fff',
+      padding: '14px 28px', borderRadius: 14, zIndex: 1000, fontFamily: ff, fontWeight: 700,
+      fontSize: 13, letterSpacing: '0.05em', textTransform: 'uppercase',
+      boxShadow: '0 12px 40px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 10
     }}>
-      {msg}
+      {type === 'error' && <Icon name="x" size={16} />}
+      {message}
     </div>
   )
 }
 
 // ─── Feature Components ───
 
-const AuthModal = ({ dark, onClose, onLoginSuccess }) => {
-  const [email, setEmail] = useState('');
-  const [pass, setPass] = useState('');
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState('');
+const AuthModal = ({ dark, onClose, onLoginSuccess, shops }) => {
+  const [view, setView] = useState('login') // login | signup | forgot
+  const [loading, setLoading] = useState(false)
+  const [toast, setToast] = useState(null)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setErr('');
+  // login fields
+  const [email, setEmail] = useState('')
+  const [pass, setPass] = useState('')
+
+  // signup fields
+  const [sName, setSName] = useState('')
+  const [sEmail, setSEmail] = useState('')
+  const [sPass, setSPass] = useState('')
+  const [sArea, setSArea] = useState('')
+  const [sShop, setSShop] = useState('')
+
+  // forgot fields
+  const [fEmail, setFEmail] = useState('')
+  const [resetSent, setResetSent] = useState(false)
+
+  // derive unique managers from shops list
+  const managers = [...new Set(shops.map(s => s.areaManager))].sort()
+  const shopsForArea = sArea
+    ? shops.filter(s => s.areaManager === sArea).map(s => s.shopName).sort()
+    : []
+
+  // ── Login ──
+  const handleLogin = async e => {
+    e.preventDefault()
+    setLoading(true)
     try {
-      if (isRegistering) {
-        // Create Auth User
-        const res = await createUserWithEmailAndPassword(auth, email, pass);
-        // Create Firestore Profile for Admin Panel tracking
-        await setDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'users', res.user.uid), {
-          email: email,
-          createdAt: new Date().toISOString(),
-          role: 'agent'
-        });
-      } else {
-        await signInWithEmailAndPassword(auth, email, pass);
-      }
-      onLoginSuccess();
-      onClose();
-    } catch (error) {
-      console.error(error);
-      if (error.code === 'auth/email-already-in-use') setErr('This email is already registered.');
-      else if (error.code === 'auth/weak-password') setErr('Password should be at least 6 characters.');
-      else setErr('Invalid credentials. Please check and try again.');
-    } finally {
-      setLoading(false);
+      await signInWithEmailAndPassword(auth, email, pass)
+      onLoginSuccess()
+      onClose()
+    } catch (err) {
+      setToast({ message: 'Login failed: ' + err.message, type: 'error' })
+    } finally { setLoading(false) }
+  }
+
+  // ── Signup (stores pending request in Firestore) ──
+  const handleSignup = async e => {
+    e.preventDefault()
+    if (!sArea || !sShop) {
+      return setToast({ message: 'Please select area manager and shop', type: 'error' })
     }
+    setLoading(true)
+    try {
+      const id = Date.now().toString()
+      await setDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'requests', id), {
+        id, agentName: sName, email: sEmail, password: sPass,
+        areaManager: sArea, shopName: sShop,
+        status: 'pending', createdAt: new Date().toISOString(),
+      })
+      setToast({ message: 'Application submitted! Await admin approval.', type: 'success' })
+      setTimeout(() => { setView('login'); resetSignup() }, 2500)
+    } catch (err) {
+      setToast({ message: 'Submission failed: ' + err.message, type: 'error' })
+    } finally { setLoading(false) }
+  }
+
+  const resetSignup = () => {
+    setSName(''); setSEmail(''); setSPass(''); setSArea(''); setSShop('')
+  }
+
+  // ── Forgot password ──
+  const handleForgot = async e => {
+    e.preventDefault()
+    if (!fEmail) return setToast({ message: 'Enter your email address', type: 'error' })
+    setLoading(true)
+    try {
+      await sendPasswordResetEmail(auth, fEmail)
+      setResetSent(true)
+    } catch (err) {
+      setToast({ message: 'Error: ' + err.message, type: 'error' })
+    } finally { setLoading(false) }
+  }
+
+  // Styles from provided code
+  const card = {
+    background: dark ? '#111' : '#fff',
+    borderRadius: 20,
+    padding: '36px 32px',
+    width: '100%', maxWidth: 400,
+    position: 'relative',
+    boxShadow: '0 32px 80px rgba(0,0,0,0.5)',
+    border: `1px solid ${dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
+  }
+  const textLink = {
+    background: 'none', border: 'none', cursor: 'pointer',
+    fontFamily: ff, fontWeight: 700,
+    fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase',
+  }
+  const heading = {
+    fontFamily: ff, fontWeight: 900,
+    fontSize: 22, letterSpacing: '0.1em', textTransform: 'uppercase',
+    color: dark ? '#fff' : '#111', margin: 0,
+  }
+  const sub = {
+    fontFamily: ff, fontSize: 11,
+    letterSpacing: '0.2em', textTransform: 'uppercase',
+    color: dark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)',
+    margin: '4px 0 0',
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
-      <div style={{ background: dark ? '#111' : '#fff', padding: 32, borderRadius: 20, width: '100%', maxWidth: 400, boxShadow: '0 20px 50px rgba(0,0,0,0.3)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <h2 style={{ fontFamily: ff, fontSize: 24, fontWeight: 800, textTransform: 'uppercase', margin: 0 }}>
-            {isRegistering ? 'Create Account' : 'Agent Portal'}
-          </h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: dark ? '#fff' : '#111' }}><Icon name="x" /></button>
-        </div>
-        
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div>
-            <label style={{ display: 'block', marginBottom: 6, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', opacity: 0.6 }}>Email Address</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required style={{ width: '100%', padding: '12px 16px', borderRadius: 8, border: '1px solid rgba(128,128,128,0.2)', background: dark ? '#1a1a1a' : '#fff', color: 'inherit' }} />
-          </div>
-          <div>
-            <label style={{ display: 'block', marginBottom: 6, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', opacity: 0.6 }}>Password</label>
-            <input type="password" value={pass} onChange={e => setPass(e.target.value)} required style={{ width: '100%', padding: '12px 16px', borderRadius: 8, border: '1px solid rgba(128,128,128,0.2)', background: dark ? '#1a1a1a' : '#fff', color: 'inherit' }} />
-          </div>
-          
-          {err && <p style={{ color: '#ef4444', fontSize: 13, margin: 0, fontWeight: 600 }}>{err}</p>}
-          
-          <Btn type="submit" disabled={loading}>
-            {loading ? 'Processing...' : (isRegistering ? 'Register' : 'Sign In')}
-          </Btn>
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 200,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(0,0,0,0.92)', padding: 20,
+      }}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <div style={card}>
+        <button onClick={onClose} style={{
+          position: 'absolute', top: 16, right: 16,
+          background: 'none', border: 'none', cursor: 'pointer',
+          color: dark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)'
+        }}>
+          <Icon name="x" size={18} />
+        </button>
 
-          <button 
-            type="button"
-            onClick={() => { setIsRegistering(!isRegistering); setErr(''); }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 13, fontWeight: 700, fontFamily: ff, textTransform: 'uppercase', marginTop: 8 }}
-          >
-            {isRegistering ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
-          </button>
-        </form>
+        {/* ═══ LOGIN ═══ */}
+        {view === 'login' && (
+          <form onSubmit={handleLogin}>
+            <div style={{ textAlign: 'center', marginBottom: 28 }}>
+              <div style={{
+                width: 48, height: 48, background: '#ef4444', borderRadius: 12,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 14px', color: '#fff',
+                fontFamily: ff, fontWeight: 900, fontSize: 20,
+              }}>PE</div>
+              <h2 style={heading}>Agent Portal</h2>
+              <p style={sub}>Authorize your session</p>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <Input type="email" placeholder="Email Address" value={email}
+                onChange={e => setEmail(e.target.value)} required dark={dark} />
+              <Input type="password" placeholder="Password" value={pass}
+                onChange={e => setPass(e.target.value)} required dark={dark} />
+              <Btn type="submit" color="black" full disabled={loading}>
+                {loading ? 'Verifying…' : 'Authorize Session'}
+              </Btn>
+            </div>
+            <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10, textAlign: 'center' }}>
+              <button type="button" onClick={() => setView('forgot')}
+                style={{ ...textLink, color: '#ef4444', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <Icon name="key" size={13} /> Forgot Password?
+              </button>
+              <button type="button" onClick={() => setView('signup')}
+                style={{ ...textLink, color: dark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)' }}>
+                New Agent? Apply for Access
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* ═══ FORGOT PASSWORD ═══ */}
+        {view === 'forgot' && (
+          <div>
+            <div style={{ textAlign: 'center', marginBottom: 28 }}>
+              <div style={{
+                width: 48, height: 48, background: 'rgba(239,68,68,0.12)',
+                border: '1px solid rgba(239,68,68,0.3)',
+                borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 14px', color: '#ef4444',
+              }}>
+                <Icon name="key" size={24} />
+              </div>
+              <h2 style={heading}>Reset Password</h2>
+              <p style={sub}>We'll send a secure link to your email</p>
+            </div>
+
+            {!resetSent ? (
+              <form onSubmit={handleForgot}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <Input type="email" placeholder="Your Registered Email" value={fEmail}
+                    onChange={e => setFEmail(e.target.value)} required dark={dark} />
+                  <Btn type="submit" color="red" full disabled={loading}>
+                    {loading ? 'Sending…' : 'Send Reset Link'}
+                  </Btn>
+                </div>
+              </form>
+            ) : (
+              <div style={{
+                background: 'rgba(34,197,94,0.08)',
+                border: '1px solid rgba(34,197,94,0.25)',
+                borderRadius: 14, padding: '24px 20px', textAlign: 'center',
+              }}>
+                <div style={{ fontSize: 36, marginBottom: 10 }}>✉️</div>
+                <p style={{
+                  fontFamily: ff, fontWeight: 800,
+                  fontSize: 14, letterSpacing: '0.1em', textTransform: 'uppercase',
+                  color: '#22c55e', margin: '0 0 8px',
+                }}>Check Your Inbox</p>
+                <p style={{
+                  fontFamily: ff, fontSize: 12,
+                  color: dark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)',
+                  lineHeight: 1.5,
+                }}>
+                  A password reset link was sent to{' '}
+                  <strong style={{ color: dark ? '#fff' : '#111' }}>{fEmail}</strong>
+                  <br />Check your spam folder if you don't see it.
+                </p>
+              </div>
+            )}
+
+            <div style={{ marginTop: 20, textAlign: 'center' }}>
+              <button type="button" onClick={() => { setView('login'); setResetSent(false); setFEmail('') }}
+                style={{ ...textLink, color: dark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }}>
+                ← Back to Login
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ═══ SIGNUP ═══ */}
+        {view === 'signup' && (
+          <form onSubmit={handleSignup}>
+            <div style={{ textAlign: 'center', marginBottom: 22 }}>
+              <h2 style={heading}>Agent Application</h2>
+              <p style={sub}>Request account activation</p>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <Input placeholder="Full Name" value={sName}
+                onChange={e => setSName(e.target.value)} required dark={dark} />
+              <Input type="email" placeholder="Email Address" value={sEmail}
+                onChange={e => setSEmail(e.target.value)} required dark={dark} />
+              <Input type="password" placeholder="Set Password" value={sPass}
+                onChange={e => setSPass(e.target.value)} required dark={dark} />
+
+              <select
+                value={sArea}
+                onChange={e => { setSArea(e.target.value); setSShop('') }}
+                required
+                style={{
+                  width: '100%', padding: '11px 14px',
+                  background: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+                  border: `1px solid ${dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
+                  borderRadius: 10, color: dark ? '#fff' : '#111',
+                  fontFamily: ff, fontWeight: 600,
+                  fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', outline: 'none',
+                }}
+              >
+                <option value="">SELECT AREA MANAGER</option>
+                {managers.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+
+              <select
+                value={sShop}
+                onChange={e => setSShop(e.target.value)}
+                disabled={!sArea}
+                required
+                style={{
+                  width: '100%', padding: '11px 14px',
+                  background: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+                  border: `1px solid ${dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
+                  borderRadius: 10, color: dark ? '#fff' : '#111',
+                  fontFamily: ff, fontWeight: 600,
+                  fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', outline: 'none',
+                  opacity: !sArea ? 0.5 : 1,
+                }}
+              >
+                <option value="">SELECT SHOP</option>
+                {shopsForArea.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+
+              <Btn type="submit" color="red" full disabled={loading}>
+                {loading ? 'Submitting…' : 'Submit Application'}
+              </Btn>
+            </div>
+            <div style={{ marginTop: 16, textAlign: 'center' }}>
+              <button type="button" onClick={() => setView('login')}
+                style={{ ...textLink, color: dark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }}>
+                Already registered? Login
+              </button>
+            </div>
+          </form>
+        )}
+
+        {toast && <Toast {...toast} onClose={() => setToast(null)} />}
       </div>
     </div>
   )
@@ -331,11 +567,15 @@ export default function App() {
       const users = []; snap.forEach(d => users.push({ id: d.id, ...d.data() })); setAppState(s => ({ ...s, users }))
     })
 
+    const unsubShops = onSnapshot(collection(db, 'artifacts', APP_ID, 'public', 'data', 'shops'), snap => {
+      const shops = []; snap.forEach(d => shops.push({ id: d.id, ...d.data() })); setAppState(s => ({ ...s, shops }))
+    })
+
     const unsubReqs = onSnapshot(collection(db, 'artifacts', APP_ID, 'public', 'data', 'requests'), snap => {
       const requests = []; snap.forEach(d => requests.push({ id: d.id, ...d.data() })); setAppState(s => ({ ...s, requests }))
     })
 
-    return () => { unsubAuth(); unsubMat(); unsubUsers(); unsubReqs() }
+    return () => { unsubAuth(); unsubMat(); unsubUsers(); unsubShops(); unsubReqs() }
   }, [])
 
   const handleLogout = async () => {
@@ -403,7 +643,7 @@ export default function App() {
         <p style={{ fontFamily: ff, fontWeight: 600, fontSize: 10, letterSpacing: '0.3em', textTransform: 'uppercase', color: dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.3)' }}>© {new Date().getFullYear()} Pyramids Express Quality App</p>
       </footer>
 
-      {authOpen && <AuthModal dark={dark} onClose={() => setAuthOpen(false)} onLoginSuccess={() => navigate('dashboard')} />}
+      {authOpen && <AuthModal dark={dark} shops={appState.shops} onClose={() => setAuthOpen(false)} onLoginSuccess={() => navigate('dashboard')} />}
       {viewer && <MediaViewer material={viewer} onClose={() => setViewer(null)} />}
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
     </div>
