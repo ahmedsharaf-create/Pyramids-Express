@@ -13,6 +13,15 @@ import {
 
 const ff = "'Barlow Condensed', sans-serif"
 
+// Pages that need a logged-in user
+const AUTH_REQUIRED = [
+  'dashboard', 'admin',
+  'orange-info', 'corporate', 'incentives', 'medical', 'activities',
+]
+
+// Pages that should NOT be restored on refresh if the user is not logged in
+const PRIVATE_PAGES = AUTH_REQUIRED
+
 const INITIAL_STATE = {
   isLoggedIn: false, isAdmin: false, user: null,
   materials: {
@@ -22,29 +31,125 @@ const INITIAL_STATE = {
   users: [], shops: [], requests: [],
 }
 
-export default function App() {
-  const [dark,     setDark]     = useState(false)
-  const [page,     setPage]     = useState('home')
-  const [authOpen, setAuthOpen] = useState(false)
-  const [viewer,   setViewer]   = useState(null)
-  const [toast,    setToast]    = useState(null)
-  const [appState, setAppState] = useState(INITIAL_STATE)
+// ─── Splash screen shown while Firebase rehydrates the auth session ───────────
+function AuthSplash({ dark }) {
+  const bg   = dark ? '#0a0a0a' : '#fafafa'
+  const text = dark ? '#fff'    : '#111'
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: bg,
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center', gap: 24,
+    }}>
+      {/* Logo */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        fontFamily: ff, fontWeight: 900, fontSize: 22,
+        letterSpacing: '0.15em', textTransform: 'uppercase', color: text,
+      }}>
+        <span style={{
+          background: '#ef4444', color: '#fff',
+          padding: '4px 10px', borderRadius: 6, fontSize: 16,
+        }}>PE</span>
+        Pyramids Express
+      </div>
 
+      {/* Animated bar */}
+      <div style={{
+        width: 200, height: 3,
+        background: dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)',
+        borderRadius: 99, overflow: 'hidden',
+      }}>
+        <div style={{
+          height: '100%', borderRadius: 99,
+          background: 'linear-gradient(90deg,#ef4444,#f97316)',
+          animation: 'progressPulse 1.6s ease-in-out infinite',
+        }} />
+      </div>
+
+      <p style={{
+        fontFamily: ff, fontWeight: 600, fontSize: 11,
+        letterSpacing: '0.22em', textTransform: 'uppercase',
+        color: dark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)',
+        margin: 0,
+      }}>
+        Restoring your session…
+      </p>
+
+      <style>{`
+        @keyframes progressPulse {
+          0%   { width: 0%;   margin-left: 0;    }
+          50%  { width: 65%;  margin-left: 0;    }
+          100% { width: 0%;   margin-left: 100%; }
+        }
+      `}</style>
+    </div>
+  )
+}
+
+export default function App() {
+  const [dark,      setDark]      = useState(() => localStorage.getItem('pe_dark') === 'true')
+  const [authReady, setAuthReady] = useState(false)   // ← wait for Firebase to rehydrate
+  const [page,      setPage]      = useState('home')  // will be set after auth resolves
+  const [authOpen,  setAuthOpen]  = useState(false)
+  const [viewer,    setViewer]    = useState(null)
+  const [toast,     setToast]     = useState(null)
+  const [appState,  setAppState]  = useState(INITIAL_STATE)
+
+  // ── Persist dark mode preference ─────────────────────────────────────────
+  const toggleDark = () => {
+    setDark(d => {
+      localStorage.setItem('pe_dark', String(!d))
+      return !d
+    })
+  }
+
+  // ── Navigate — also saves page to localStorage for post-refresh restore ──
+  const navigate = (p) => {
+    setPage(p)
+    // Only persist non-home pages that need auth, so after refresh we land
+    // on the right page once Firebase confirms the session
+    if (PRIVATE_PAGES.includes(p)) {
+      localStorage.setItem('pe_last_page', p)
+    } else {
+      localStorage.removeItem('pe_last_page')
+    }
+  }
+
+  // ── Firebase setup ────────────────────────────────────────────────────────
   useEffect(() => {
+    // Anonymous sign-in as fallback for public Firestore reads
+    // (only fires if no real user is already persisted)
     signInAnonymously(auth).catch(() => {})
 
     const unsubAuth = onAuthStateChanged(auth, user => {
       if (user?.email) {
-        const isAdmin = user.email === 'admin@pyramidsexpress.com'
+        // Real signed-in user — restore their last page if we have one
+        const isAdmin    = user.email === 'admin@pyramidsexpress.com'
+        const savedPage  = localStorage.getItem('pe_last_page')
+        const targetPage = savedPage || 'dashboard'
+
         setAppState(s => ({
           ...s, isLoggedIn: true, isAdmin,
-          user: { uid: user.uid, email: user.email, name: isAdmin ? 'System Admin' : 'Pe Agent' },
+          user: { uid: user.uid, email: user.email, name: isAdmin ? 'System Admin' : 'PE Agent' },
         }))
+        setPage(targetPage)
       } else {
-        setAppState(s => ({ ...s, isLoggedIn: false, isAdmin: false, user: user ? { uid: user.uid } : null }))
+        // Anonymous / logged-out — clear saved page, go home
+        localStorage.removeItem('pe_last_page')
+        setAppState(s => ({
+          ...s, isLoggedIn: false, isAdmin: false,
+          user: user ? { uid: user.uid } : null,
+        }))
+        setPage('home')
       }
+
+      // Auth has resolved — hide splash screen
+      setAuthReady(true)
     })
 
+    // ── Firestore listeners ──────────────────────────────────────────────
     const unsubMat = onSnapshot(
       collection(db, 'artifacts', APP_ID, 'public', 'data', 'materials'),
       snap => {
@@ -87,16 +192,18 @@ export default function App() {
     return () => { unsubAuth(); unsubMat(); unsubUsers(); unsubShops(); unsubReqs() }
   }, [])
 
-  const handleLogout = async () => { await signOut(auth); setPage('home') }
+  const handleLogout = async () => {
+    await signOut(auth)
+    localStorage.removeItem('pe_last_page')
+    setPage('home')
+  }
+
+  // ── While Firebase is rehydrating the token, show splash ─────────────────
+  if (!authReady) return <AuthSplash dark={dark} />
 
   const bg     = dark ? '#0a0a0a' : '#fafafa'
   const text   = dark ? '#fff'    : '#111'
   const border = dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'
-
-  const authRequired = [
-    'dashboard', 'admin',
-    'orange-info', 'corporate', 'incentives', 'medical', 'activities',
-  ]
 
   return (
     <div style={{ minHeight: '100vh', background: bg, color: text, transition: 'background 0.3s, color 0.3s' }}>
@@ -108,30 +215,33 @@ export default function App() {
         backdropFilter: 'blur(14px)', borderBottom: `1px solid ${border}`,
         display: 'flex', alignItems: 'center',
       }}>
-        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 20px', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{
+          maxWidth: 1280, margin: '0 auto', padding: '0 20px',
+          width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
           {/* Brand */}
-          <button onClick={() => setPage('home')} style={{
+          <button onClick={() => navigate('home')} style={{
             background: 'none', border: 'none', cursor: 'pointer',
             fontFamily: ff, fontWeight: 900, fontSize: 18, letterSpacing: '0.15em',
             textTransform: 'uppercase', color: text,
             display: 'flex', alignItems: 'center', gap: 10,
           }}>
-            <span style={{ background: '#ef4444', color: '#fff', padding: '2px 8px', borderRadius: 5, fontSize: 14 }}>Pe</span>
+            <span style={{ background: '#ef4444', color: '#fff', padding: '2px 8px', borderRadius: 5, fontSize: 14 }}>PE</span>
             Pyramids Express
           </button>
 
           {/* Links */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
-            <button onClick={() => setDark(!dark)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: text, opacity: 0.55, padding: 4 }}>
+            <button onClick={toggleDark} style={{ background: 'none', border: 'none', cursor: 'pointer', color: text, opacity: 0.55, padding: 4 }}>
               <Icon name={dark ? 'sun' : 'moon'} size={18} />
             </button>
 
-            <NavLink label="Home"      onClick={() => setPage('home')}      dark={dark} />
-            {appState.isLoggedIn && <NavLink label="Dashboard" onClick={() => setPage('dashboard')} dark={dark} />}
-            {appState.isLoggedIn && <NavLink label="Activities" onClick={() => setPage('activities')} dark={dark} active={page === 'activities'} />}
+            <NavLink label="Home"       onClick={() => navigate('home')}       dark={dark} />
+            {appState.isLoggedIn && <NavLink label="Dashboard"  onClick={() => navigate('dashboard')}  dark={dark} />}
+            {appState.isLoggedIn && <NavLink label="Activities" onClick={() => navigate('activities')} dark={dark} active={page === 'activities'} />}
 
             {appState.isAdmin && (
-              <button onClick={() => setPage('admin')} style={{
+              <button onClick={() => navigate('admin')} style={{
                 background: 'none', border: 'none', cursor: 'pointer',
                 fontFamily: ff, fontWeight: 800, fontSize: 12, letterSpacing: '0.15em',
                 textTransform: 'uppercase', color: '#ef4444',
@@ -168,10 +278,14 @@ export default function App() {
 
       {/* ─── Main ── */}
       <main style={{ paddingTop: 60 }}>
-        {/* Auth gate */}
-        {authRequired.includes(page) && !appState.isLoggedIn ? (
+        {/* Auth gate — authReady is true here so no flash */}
+        {AUTH_REQUIRED.includes(page) && !appState.isLoggedIn ? (
           <div style={{ textAlign: 'center', padding: '120px 20px' }}>
-            <p style={{ fontFamily: ff, fontWeight: 700, fontSize: 14, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(128,128,128,0.4)', marginBottom: 20 }}>
+            <p style={{
+              fontFamily: ff, fontWeight: 700, fontSize: 14,
+              letterSpacing: '0.2em', textTransform: 'uppercase',
+              color: 'rgba(128,128,128,0.4)', marginBottom: 20,
+            }}>
               Please log in to access this page.
             </p>
             <Btn onClick={() => setAuthOpen(true)} color="red">Agent Login</Btn>
@@ -179,25 +293,25 @@ export default function App() {
         ) : (
           <>
             {page === 'home' && (
-              <HomePage dark={dark} isLoggedIn={appState.isLoggedIn} onLogin={() => setAuthOpen(true)} onNavigate={setPage} />
+              <HomePage dark={dark} isLoggedIn={appState.isLoggedIn} onLogin={() => setAuthOpen(true)} onNavigate={navigate} />
             )}
             {page === 'dashboard' && (
-              <DashboardPage dark={dark} onNavigate={setPage} />
+              <DashboardPage dark={dark} onNavigate={navigate} />
             )}
             {page === 'admin' && appState.isAdmin && (
               <AdminPage dark={dark} state={appState} onView={setViewer} setToast={setToast} />
             )}
             {page === 'activities' && (
-              <ActivitiesPage dark={dark} materials={appState.materials} onBack={() => setPage('dashboard')} onView={setViewer} />
+              <ActivitiesPage dark={dark} materials={appState.materials} onBack={() => navigate('dashboard')} onView={setViewer} />
             )}
             {['orange-info', 'corporate', 'incentives', 'medical'].includes(page) && (
-              <MaterialsPage dark={dark} category={page} materials={appState.materials} onBack={() => setPage('dashboard')} onView={setViewer} />
+              <MaterialsPage dark={dark} category={page} materials={appState.materials} onBack={() => navigate('dashboard')} onView={setViewer} />
             )}
             {page === 'heroes' && (
-              <HeroesPage dark={dark} materials={appState.materials} onBack={() => setPage('home')} onView={setViewer} />
+              <HeroesPage dark={dark} materials={appState.materials} onBack={() => navigate('home')} onView={setViewer} />
             )}
             {page === 'events' && (
-              <EventsPage dark={dark} materials={appState.materials} onBack={() => setPage('home')} onView={setViewer} />
+              <EventsPage dark={dark} materials={appState.materials} onBack={() => navigate('home')} onView={setViewer} />
             )}
           </>
         )}
@@ -226,7 +340,7 @@ export default function App() {
       </footer>
 
       {authOpen && (
-        <AuthModal dark={dark} shops={appState.shops} onClose={() => setAuthOpen(false)} onLoginSuccess={() => setPage('dashboard')} />
+        <AuthModal dark={dark} shops={appState.shops} onClose={() => setAuthOpen(false)} onLoginSuccess={() => navigate('dashboard')} />
       )}
       {viewer && <MediaViewer material={viewer} onClose={() => setViewer(null)} />}
       {toast  && <Toast {...toast} onClose={() => setToast(null)} />}
