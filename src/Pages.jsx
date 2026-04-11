@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Icon, Btn } from './ui.jsx'
 
 const ff = "'Barlow Condensed', sans-serif"
@@ -343,11 +343,179 @@ function ActivityCard({ item, dark, onView }) {
   )
 }
 
+// ─── Omega Care Loading Screen ───────────────────────────────────────────────
+function OmegaCareLoader({ dark }) {
+  const [msgIdx, setMsgIdx] = useState(0)
+  const [dots,   setDots]   = useState(0)
+  const [bars,   setBars]   = useState([40, 65, 30, 80, 55, 70, 45, 60])
+
+  const messages = [
+    'Connecting to Omega Care Network',
+    'Retrieving your insurance data',
+    'Syncing health coverage records',
+    'Preparing your medical portal',
+    'Almost there, loading your data',
+  ]
+
+  // cycle through status messages
+  useEffect(() => {
+    const t = setInterval(() => setMsgIdx(i => (i + 1) % messages.length), 2800)
+    return () => clearInterval(t)
+  }, [])
+
+  // animate trailing dots
+  useEffect(() => {
+    const t = setInterval(() => setDots(d => (d + 1) % 4), 500)
+    return () => clearInterval(t)
+  }, [])
+
+  // animate bar heights for the visualiser
+  useEffect(() => {
+    const t = setInterval(() => {
+      setBars(prev => prev.map(() => 20 + Math.random() * 70))
+    }, 600)
+    return () => clearInterval(t)
+  }, [])
+
+  const dotStr = '.'.repeat(dots)
+
+  return (
+    <div style={{
+      width: '100%', aspectRatio: '16/9',
+      background: dark
+        ? 'linear-gradient(135deg,#0a0a0a 0%,#150505 50%,#0a0a0a 100%)'
+        : 'linear-gradient(135deg,#fff5f5 0%,#fde8e8 50%,#fff5f5 100%)',
+      borderRadius: 20, overflow: 'hidden', position: 'relative',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center', gap: 0,
+      border: `1px solid ${dark ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.12)'}`,
+    }}>
+      {/* Animated background grid */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        backgroundImage: dark
+          ? 'linear-gradient(rgba(239,68,68,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(239,68,68,0.03) 1px,transparent 1px)'
+          : 'linear-gradient(rgba(239,68,68,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(239,68,68,0.06) 1px,transparent 1px)',
+        backgroundSize: '40px 40px',
+        animation: 'gridScroll 8s linear infinite',
+      }} />
+
+      {/* Glow blob */}
+      <div style={{
+        position: 'absolute', width: 300, height: 300, borderRadius: '50%',
+        background: 'radial-gradient(circle,rgba(239,68,68,0.12) 0%,transparent 70%)',
+        animation: 'blobPulse 3s ease-in-out infinite',
+        pointerEvents: 'none',
+      }} />
+
+      {/* Central content */}
+      <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', padding: '0 32px', maxWidth: 480 }}>
+
+        {/* Logo mark */}
+        <div style={{
+          width: 72, height: 72, borderRadius: 20,
+          background: dark ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.08)',
+          border: '2px solid rgba(239,68,68,0.3)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 24px',
+          animation: 'iconPulse 2s ease-in-out infinite',
+          boxShadow: '0 0 32px rgba(239,68,68,0.2)',
+        }}>
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+          </svg>
+        </div>
+
+        {/* Brand */}
+        <p style={{
+          fontFamily: ff, fontWeight: 900, fontSize: 'clamp(16px,3vw,22px)',
+          textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 6px',
+          color: dark ? '#fff' : '#111',
+        }}>
+          Omega Care Network
+        </p>
+        <p style={{
+          fontFamily: ff, fontWeight: 600, fontSize: 'clamp(10px,1.5vw,12px)',
+          textTransform: 'uppercase', letterSpacing: '0.2em',
+          color: 'rgba(239,68,68,0.8)', margin: '0 0 32px',
+        }}>
+          Medical Insurance Portal
+        </p>
+
+        {/* Bar visualiser */}
+        <div style={{
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          gap: 4, height: 36, marginBottom: 28,
+        }}>
+          {bars.map((h, i) => (
+            <div key={i} style={{
+              width: 5, borderRadius: 3,
+              background: `rgba(239,68,68,${0.3 + (i % 3) * 0.2})`,
+              height: `${h}%`,
+              transition: `height ${0.4 + i * 0.05}s ease`,
+            }} />
+          ))}
+        </div>
+
+        {/* Progress bar */}
+        <div style={{
+          width: '100%', maxWidth: 320, height: 3,
+          background: dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)',
+          borderRadius: 99, margin: '0 auto 18px', overflow: 'hidden',
+        }}>
+          <div style={{
+            height: '100%', borderRadius: 99,
+            background: 'linear-gradient(90deg,#ef4444,#f97316)',
+            animation: 'progressPulse 2.4s ease-in-out infinite',
+          }} />
+        </div>
+
+        {/* Status message */}
+        <p style={{
+          fontFamily: ff, fontWeight: 700,
+          fontSize: 'clamp(10px,1.6vw,13px)',
+          letterSpacing: '0.12em', textTransform: 'uppercase',
+          color: dark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)',
+          margin: 0, minHeight: '1.4em',
+          transition: 'opacity 0.4s ease',
+        }}>
+          {messages[msgIdx]}{dotStr}
+        </p>
+      </div>
+
+      {/* Inline keyframes */}
+      <style>{`
+        @keyframes gridScroll {
+          0%   { background-position: 0 0; }
+          100% { background-position: 40px 40px; }
+        }
+        @keyframes blobPulse {
+          0%,100% { transform: scale(1);   opacity: 0.8; }
+          50%      { transform: scale(1.4); opacity: 1;   }
+        }
+        @keyframes iconPulse {
+          0%,100% { box-shadow: 0 0 24px rgba(239,68,68,0.2); }
+          50%      { box-shadow: 0 0 48px rgba(239,68,68,0.45); }
+        }
+        @keyframes progressPulse {
+          0%   { width: 0%;    margin-left: 0; }
+          50%  { width: 70%;   margin-left: 0; }
+          100% { width: 0%;    margin-left: 100%; }
+        }
+      `}</style>
+    </div>
+  )
+}
+
 // ─── Materials Page ───────────────────────────────────────────────────────────
 export function MaterialsPage({ dark, category, materials, onBack, onView }) {
-  const items    = materials[category] || []
-  const label    = category.replace(/-/g, ' ')
+  const items     = materials[category] || []
+  const label     = category.replace(/-/g, ' ')
   const isMedical = category === 'medical'
+  const [iframeReady, setIframeReady] = useState(false)
+
+  // reset loader every time user navigates to medical
+  useEffect(() => { setIframeReady(false) }, [category])
 
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', padding: '48px 20px', animation: 'fadeUp 0.4s ease' }}>
@@ -362,16 +530,35 @@ export function MaterialsPage({ dark, category, materials, onBack, onView }) {
       <h1 style={{ fontFamily: ff, fontWeight: 900, fontSize: 40, textTransform: 'uppercase', letterSpacing: '-0.02em', margin: '0 0 40px', color: dark ? '#fff' : '#111' }}>
         {label} <span style={{ color: '#ef4444' }}>Portal</span>
       </h1>
+
       {isMedical && (
-        <div style={{ marginBottom: 40, borderRadius: 20, overflow: 'hidden', border: `1px solid ${dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'}`, paddingBottom: '56.25%', position: 'relative', height: 0 }}>
-          <iframe
-            src="https://lookerstudio.google.com/embed/reporting/01d55067-0527-435e-9e17-5a692003f0b0/page/N7h0D"
-            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
-            allowFullScreen
-            sandbox="allow-storage-access-by-user-activation allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-          />
+        <div style={{ marginBottom: 40 }}>
+          {/* Loader — shown until iframe fires onLoad */}
+          {!iframeReady && <OmegaCareLoader dark={dark} />}
+
+          {/* iframe wrapper — invisible until loaded, then fades in */}
+          <div style={{
+            borderRadius: 20, overflow: 'hidden',
+            border: `1px solid ${dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'}`,
+            paddingBottom: '56.25%', position: 'relative', height: 0,
+            opacity: iframeReady ? 1 : 0,
+            transition: 'opacity 0.6s ease',
+            // keep in DOM so iframe can load in background
+            position: iframeReady ? 'relative' : 'absolute',
+            pointerEvents: iframeReady ? 'auto' : 'none',
+            visibility: iframeReady ? 'visible' : 'hidden',
+          }}>
+            <iframe
+              src="https://lookerstudio.google.com/embed/reporting/01d55067-0527-435e-9e17-5a692003f0b0/page/N7h0D"
+              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+              allowFullScreen
+              onLoad={() => setIframeReady(true)}
+              sandbox="allow-storage-access-by-user-activation allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+            />
+          </div>
         </div>
       )}
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
         {items.map(item => (
           <div key={item.id} onClick={() => onView(item)} style={{
