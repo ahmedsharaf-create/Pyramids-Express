@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app'
-import { getAuth } from 'firebase/auth'
+import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 
 const firebaseConfig = {
@@ -15,3 +15,10 @@ export const APP_ID = 'pyramids-express-52a27'
 export const app    = initializeApp(firebaseConfig)
 export const auth   = getAuth(app)
 export const db     = getFirestore(app)
+
+// ── Persist auth session in localStorage so it survives page refreshes ────────
+// This is the key fix: default persistence in some environments is SESSION
+// (cleared on tab close / refresh). LOCAL keeps the user signed in.
+setPersistence(auth, browserLocalPersistence).catch(err => {
+  console.warn('Auth persistence error:', err)
+})
