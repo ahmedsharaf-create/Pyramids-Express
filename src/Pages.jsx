@@ -71,12 +71,13 @@ export function HomePage({ dark, isLoggedIn, onLogin, onNavigate }) {
 }
 
 // ─── Dashboard Page ───────────────────────────────────────────────────────────
-export function DashboardPage({ dark, onNavigate }) {
+export function DashboardPage({ dark, onNavigate, appState = {} }) {
   const cards = [
     { id: 'medical',     title: 'Medical Insurance',   sub: 'Omega Care Network',    icon: 'heart' },
     { id: 'orange-info', title: 'Orange Info',         sub: 'Sales & Tariffs',       icon: 'globe' },
     { id: 'corporate',   title: 'Corporate Materials', sub: 'Solutions',             icon: 'briefcase' },
     { id: 'incentives',  title: 'Incentives',          sub: 'Rewards & Recognition', icon: 'award' },
+    { id: 'retail-map',  title: 'Retail Map',          sub: 'Your Chain of Command', icon: 'gitBranch' },
   ]
 
   return (
