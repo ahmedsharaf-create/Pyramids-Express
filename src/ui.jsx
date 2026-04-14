@@ -38,6 +38,7 @@ const PATHS = {
   activity:   "M22 12h-4l-3 9L9 3l-3 9H2",
   calendar:   "M3 9h18M3 5h18a2 2 0 012 2v14a2 2 0 01-2 2H3a2 2 0 01-2-2V7a2 2 0 012-2zM8 3v4M16 3v4",
   trendUp:    "M23 6l-9.5 9.5-5-5L1 18M17 6h6v6",
+  gitBranch:  "M6 3a3 3 0 100 6 3 3 0 000-6zM18 15a3 3 0 100 6 3 3 0 000-6zM6 21V9m12 0V6m0 0a3 3 0 100 6 3 3 0 000-6zM6 9a9 9 0 0012 8.46",
 }
 
 export function Icon({ name, size = 20, className = '', style = {} }) {
