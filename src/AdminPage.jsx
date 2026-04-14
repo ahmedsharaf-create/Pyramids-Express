@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { db, APP_ID } from './firebase.js'
 import { doc, setDoc, deleteDoc, collection } from 'firebase/firestore'
 import { Icon, Btn, Input, Select, Card, Toast } from './ui.jsx'
+import { RetailMapAdmin } from './RetailMapPage.jsx'
 
 const ff = "'Barlow Condensed', sans-serif"
 
@@ -189,10 +190,11 @@ export default function AdminPage({ dark, state, onView, setToast }) {
 
   // ─── Layout helpers ────────────────────────────────────────────────────────
   const TABS = [
-    { id: 'shops',     label: 'Shops & Managers', icon: 'store' },
-    { id: 'users',     label: 'Agents',           icon: 'users' },
-    { id: 'materials', label: 'Resources',        icon: 'fileText' },
-    { id: 'requests',  label: 'Requests',         icon: 'warning', badge: state.requests.length },
+    { id: 'shops',      label: 'Shops & Managers', icon: 'store' },
+    { id: 'users',      label: 'Agents',           icon: 'users' },
+    { id: 'retailmap',  label: 'Retail Map',       icon: 'gitBranch' },
+    { id: 'materials',  label: 'Resources',        icon: 'fileText' },
+    { id: 'requests',   label: 'Requests',         icon: 'warning', badge: state.requests.length },
   ]
 
   return (
@@ -479,6 +481,16 @@ export default function AdminPage({ dark, state, onView, setToast }) {
                 )}
               </div>
             </Card>
+          )}
+
+          {/* ── TAB: Retail Map ── */}
+          {tab === 'retailmap' && (
+            <RetailMapAdmin
+              dark={dark}
+              retailMap={state.retailMap || []}
+              areas={state.shops}
+              setToast={setToast}
+            />
           )}
 
           {/* ── TAB: Materials ── */}
