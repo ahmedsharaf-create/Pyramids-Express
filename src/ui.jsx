@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 
 // ─── SVG Icon ─────────────────────────────────────────────────────────────────
 const PATHS = {
@@ -79,17 +79,72 @@ export function Toast({ message, type, onClose }) {
 }
 
 // ─── Input ────────────────────────────────────────────────────────────────────
+// Updated to automatically handle `type="password"` with a smooth show/hide toggle.
 export function Input({ type = 'text', placeholder, value, onChange, required, dark, disabled }) {
+  const [showPassword, setShowPassword] = useState(false);
+  
+  // Determine input type and specific spacing
+  const isPassword = type === 'password';
+  const currentType = isPassword ? (showPassword ? 'text' : 'password') : type;
+
   const base = {
-    width: '100%', padding: '11px 14px',
+    width: '100%', 
+    boxSizing: 'border-box',
+    padding: '11px 14px',
+    paddingRight: isPassword ? '40px' : '14px', // Space for the eye icon
     background: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
     border: `1px solid ${dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
-    borderRadius: 10, color: dark ? '#fff' : '#111',
-    fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600,
-    fontSize: 12, letterSpacing: '0.12em', textTransform: 'none',
-    outline: 'none', transition: 'border-color 0.2s',
-    opacity: disabled ? 0.5 : 1, cursor: disabled ? 'not-allowed' : 'text',
+    borderRadius: 10, 
+    color: dark ? '#fff' : '#111',
+    fontFamily: "'Barlow Condensed', sans-serif", 
+    fontWeight: 600,
+    fontSize: 12, 
+    letterSpacing: isPassword && !showPassword ? '0.25em' : '0.12em', // Give password dots breathing room
+    textTransform: 'none',
+    outline: 'none', 
+    transition: 'border-color 0.2s',
+    opacity: disabled ? 0.5 : 1, 
+    cursor: disabled ? 'not-allowed' : 'text',
   }
+
+  // Render wrapper conditionally if it's a password field
+  if (isPassword) {
+    return (
+      <div style={{ position: 'relative', width: '100%' }}>
+        <input
+          type={currentType} 
+          placeholder={placeholder} 
+          value={value}
+          onChange={onChange} 
+          required={required} 
+          disabled={disabled}
+          style={base}
+          onFocus={e => (e.target.style.borderColor = '#ef4444')}
+          onBlur={e => (e.target.style.borderColor = dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)')}
+        />
+        <div 
+          onClick={() => setShowPassword(!showPassword)}
+          style={{
+            position: 'absolute',
+            right: '12px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            cursor: 'pointer',
+            color: dark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'color 0.2s'
+          }}
+          onMouseEnter={e => e.currentTarget.style.color = dark ? '#fff' : '#111'}
+          onMouseLeave={e => e.currentTarget.style.color = dark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)'}
+        >
+          <Icon name={showPassword ? 'eyeOff' : 'eye'} size={18} />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <input
       type={type} placeholder={placeholder} value={value}
@@ -165,6 +220,55 @@ export function Card({ children, dark, style: extra = {} }) {
       ...extra,
     }}>
       {children}
+    </div>
+  )
+}
+
+// ─── DEMO APP ─────────────────────────────────────────────────────────────────
+export default function App() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: '#fafafa',
+      padding: '20px',
+      fontFamily: 'sans-serif'
+    }}>
+      <Card dark={false} style={{ width: '100%', maxWidth: '360px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+        <h2 style={{ margin: '0 0 24px 0', fontSize: '20px', color: '#111', fontFamily: "'Barlow Condensed', sans-serif" }}>
+          Welcome Back
+        </h2>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold', color: '#666' }}>Email</label>
+            <Input 
+              placeholder="name@example.com" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          
+          <div>
+            <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold', color: '#666' }}>Password</label>
+            <Input 
+              type="password" 
+              placeholder="Enter your password" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+
+          <Btn full={true} style={{ marginTop: '8px' }}>
+            <Icon name="key" size={16} /> Sign In
+          </Btn>
+        </div>
+      </Card>
     </div>
   )
 }
