@@ -80,8 +80,9 @@ export function Toast({ message, type, onClose }) {
 
 // ─── Input ────────────────────────────────────────────────────────────────────
 // Updated to automatically handle `type="password"` with a smooth show/hide toggle.
-export function Input({ type = 'text', placeholder, value, onChange, required, dark, disabled }) {
+export function Input({ type = 'text', name, id, placeholder, value, onChange, required, dark, disabled }) {
   const [showPassword, setShowPassword] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   
   // Determine input type and specific spacing
   const isPassword = type === 'password';
@@ -93,7 +94,7 @@ export function Input({ type = 'text', placeholder, value, onChange, required, d
     padding: '11px 14px',
     paddingRight: isPassword ? '40px' : '14px', // Space for the eye icon
     background: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-    border: `1px solid ${dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
+    border: `1px solid ${isFocused ? '#ef4444' : (dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)')}`,
     borderRadius: 10, 
     color: dark ? '#fff' : '#111',
     fontFamily: "'Barlow Condensed', sans-serif", 
@@ -107,21 +108,22 @@ export function Input({ type = 'text', placeholder, value, onChange, required, d
     cursor: disabled ? 'not-allowed' : 'text',
   }
 
-  // Render wrapper conditionally if it's a password field
-  if (isPassword) {
-    return (
-      <div style={{ position: 'relative', width: '100%' }}>
-        <input
-          type={currentType} 
-          placeholder={placeholder} 
-          value={value}
-          onChange={onChange} 
-          required={required} 
-          disabled={disabled}
-          style={base}
-          onFocus={e => (e.target.style.borderColor = '#ef4444')}
-          onBlur={e => (e.target.style.borderColor = dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)')}
-        />
+  return (
+    <div style={{ position: 'relative', width: '100%' }}>
+      <input
+        id={id}
+        name={name}
+        type={currentType} 
+        placeholder={placeholder} 
+        value={value}
+        onChange={onChange} 
+        required={required} 
+        disabled={disabled}
+        style={base}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+      />
+      {isPassword && (
         <div 
           onClick={() => setShowPassword(!showPassword)}
           style={{
@@ -141,18 +143,8 @@ export function Input({ type = 'text', placeholder, value, onChange, required, d
         >
           <Icon name={showPassword ? 'eyeOff' : 'eye'} size={18} />
         </div>
-      </div>
-    )
-  }
-
-  return (
-    <input
-      type={type} placeholder={placeholder} value={value}
-      onChange={onChange} required={required} disabled={disabled}
-      style={base}
-      onFocus={e => (e.target.style.borderColor = '#ef4444')}
-      onBlur={e => (e.target.style.borderColor = dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)')}
-    />
+      )}
+    </div>
   )
 }
 
@@ -248,6 +240,7 @@ export default function App() {
           <div>
             <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold', color: '#666' }}>Email</label>
             <Input 
+              name="email"
               placeholder="name@example.com" 
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -258,6 +251,7 @@ export default function App() {
             <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold', color: '#666' }}>Password</label>
             <Input 
               type="password" 
+              name="password"
               placeholder="Enter your password" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
