@@ -112,7 +112,7 @@ export function Select({ value, onChange, children, dark, disabled }) {
         border: `1px solid ${dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
         borderRadius: 10, color: dark ? '#fff' : '#111',
         fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600,
-        fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase',
+        fontSize: 12, letterSpacing: '0.12em', textTransform: 'none',
         outline: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.5 : 1,
       }}
@@ -139,7 +139,7 @@ export function Btn({ children, onClick, type = 'button', color = 'red', full = 
         border: color === 'ghost' ? '1px solid #ef4444' : 'none',
         borderRadius: 10,
         fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800,
-        fontSize: small ? 11 : 13, letterSpacing: '0.15em', textTransform: 'uppercase',
+        fontSize: small ? 11 : 13, letterSpacing: '0.15em', textTransform: 'none',
         cursor: disabled ? 'not-allowed' : 'pointer',
         transition: 'opacity 0.2s, transform 0.1s',
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
