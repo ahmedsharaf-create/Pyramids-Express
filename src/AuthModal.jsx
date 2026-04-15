@@ -1,36 +1,65 @@
 import React, { useState } from 'react';
-import { 
-  Mail, 
-  Lock, 
-  Eye, 
-  EyeOff, 
-  User, 
-  ArrowRight, 
-  CheckCircle2,
-  X,
-  Key,
-  AlertCircle
-} from 'lucide-react';
 
-// ── Mock UI Components (to keep the file self-contained) ────────────────────
+// ── Optimized SVG Icons (Internal to avoid lucide-react resolution errors) ──
 const ff = "'Barlow Condensed', sans-serif";
 
 const Icon = ({ name, size = 18 }) => {
   const icons = {
-    mail: <Mail size={size} />,
-    lock: <Lock size={size} />,
-    eye: <Eye size={size} />,
-    eyeOff: <EyeOff size={size} />,
-    user: <User size={size} />,
-    arrowRight: <ArrowRight size={size} />,
-    check: <CheckCircle2 size={size} />,
-    x: <X size={size} />,
-    key: <Key size={size} />,
-    alert: <AlertCircle size={size} />
+    mail: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+      </svg>
+    ),
+    lock: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+    ),
+    eye: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
+      </svg>
+    ),
+    eyeOff: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.52 13.52 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/>
+      </svg>
+    ),
+    user: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+      </svg>
+    ),
+    arrowRight: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+      </svg>
+    ),
+    check: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>
+      </svg>
+    ),
+    x: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+      </svg>
+    ),
+    key: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4"/><path d="m21 2-9.6 9.6"/><circle cx="7.5" cy="15.5" r="5.5"/>
+      </svg>
+    ),
+    alert: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>
+      </svg>
+    )
   };
   return icons[name] || null;
 };
 
+// ── Reusable Mock UI Components ──────────────────────────────────────────────
 const Input = ({ dark, ...props }) => (
   <input
     {...props}
@@ -40,7 +69,7 @@ const Input = ({ dark, ...props }) => (
         : 'bg-black/5 border-black/10 text-slate-900 placeholder:text-black/30 focus:border-red-500'
     }`}
     style={{ 
-      textTransform: 'none', // FORCING NO UPPERCASE
+      textTransform: 'none', // Ensure case sensitivity (mixed small/capital)
       fontFamily: 'inherit'
     }}
   />
@@ -66,11 +95,12 @@ const Toast = ({ message, type, onClose }) => (
   }`}>
     <Icon name={type === 'error' ? 'alert' : 'check'} size={18} />
     <span className="font-bold text-sm tracking-wide uppercase" style={{ fontFamily: ff }}>{message}</span>
-    <button onClick={onClose} className="ml-2 hover:opacity-70"><X size={14} /></button>
+    <button onClick={onClose} className="ml-2 hover:opacity-70">
+      <Icon name="x" size={14} />
+    </button>
   </div>
 );
 
-// ── Reusable inline select ───────────────────────────────────────────────────
 function StyledSelect({ value, onChange, disabled, children, dark }) {
   return (
     <select
@@ -91,7 +121,6 @@ function StyledSelect({ value, onChange, disabled, children, dark }) {
   );
 }
 
-// ── Password strength bar ────────────────────────────────────────────────────
 function PasswordStrength({ password }) {
   if (!password) return null;
   const score = (() => {
@@ -148,9 +177,8 @@ const PwField = ({ placeholder, value, onChange, show, onToggle, dark }) => (
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function App() {
   const [isOpen, setIsOpen] = useState(true);
-  const dark = true; // Setting theme to dark for this demo
+  const dark = true; 
   
-  // Dummy shops data for demo
   const shops = [
     { areaManager: 'John Smith', shopName: 'Shop A' },
     { areaManager: 'John Smith', shopName: 'Shop B' },
@@ -161,12 +189,10 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
-  // Login fields
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
   const [showPw, setShowPw] = useState(false);
 
-  // Signup fields
   const [sName, setSName] = useState('');
   const [sEmail, setSEmail] = useState('');
   const [sPass, setSPass] = useState('');
@@ -175,11 +201,9 @@ export default function App() {
   const [sShop, setSShop] = useState('');
   const [showSPw, setShowSPw] = useState(false);
 
-  // Forgot fields
   const [fEmail, setFEmail] = useState('');
   const [resetSent, setResetSent] = useState(false);
 
-  // Derived
   const managers = [...new Set(shops.map(s => s.areaManager))].sort();
   const shopsForArea = sArea
     ? shops.filter(s => s.areaManager === sArea).map(s => s.shopName).sort()
@@ -190,7 +214,7 @@ export default function App() {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      setToast({ message: 'Login feature requires Firebase config', type: 'error' });
+      setToast({ message: 'Login successful (Demo Mode)', type: 'success' });
     }, 1000);
   };
 
@@ -199,7 +223,7 @@ export default function App() {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      setToast({ message: 'Application sent!', type: 'success' });
+      setToast({ message: 'Application submitted!', type: 'success' });
     }, 1000);
   };
 
@@ -208,7 +232,6 @@ export default function App() {
     setResetSent(true);
   };
 
-  // Styles
   const card = {
     background: dark ? '#111' : '#fff',
     borderRadius: 20, padding: '36px 32px',
