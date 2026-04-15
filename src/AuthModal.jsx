@@ -66,14 +66,13 @@ function PasswordStrength({ password }) {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function AuthModal({ dark, onClose, onLoginSuccess, shops }) {
-  const [view,      setView]      = useState('login') // login | signup | forgot
+  const [view,      setView]     = useState('login') // login | signup | forgot
   const [loading,   setLoading]   = useState(false)
   const [toast,     setToast]     = useState(null)
 
   // ── Login fields ───────────────────────────────────────────────────────────
   const [email,  setEmail]  = useState('')
   const [pass,   setPass]   = useState('')
-  const [showPw, setShowPw] = useState(false)
 
   // ── Signup fields ──────────────────────────────────────────────────────────
   const [sName,    setSName]    = useState('')
@@ -82,7 +81,6 @@ export default function AuthModal({ dark, onClose, onLoginSuccess, shops }) {
   const [sPass2,   setSPass2]   = useState('')
   const [sArea,    setSArea]    = useState('')
   const [sShop,    setSShop]    = useState('')
-  const [showSPw,  setShowSPw]  = useState(false)
 
   // ── Forgot fields ──────────────────────────────────────────────────────────
   const [fEmail,     setFEmail]     = useState('')
@@ -185,22 +183,6 @@ export default function AuthModal({ dark, onClose, onLoginSuccess, shops }) {
   const sub     = { fontFamily: ff, fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: dark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)', margin: '4px 0 0' }
   const link    = { background: 'none', border: 'none', cursor: 'pointer', fontFamily: ff, fontWeight: 700, fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase' }
 
-  // ── Password field with show/hide toggle ───────────────────────────────────
-  const PwField = ({ id, placeholder, value, onChange, show, onToggle }) => (
-    <div style={{ position: 'relative' }}>
-      <Input id={id} type={show ? 'text' : 'password'} placeholder={placeholder}
-        value={value} onChange={onChange} required dark={dark} />
-      <button type="button" onClick={onToggle} style={{
-        position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-        background: 'none', border: 'none', cursor: 'pointer',
-        color: dark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)',
-        padding: 4, display: 'flex', alignItems: 'center',
-      }}>
-        <Icon name={show ? 'eyeOff' : 'eye'} size={15} />
-      </button>
-    </div>
-  )
-
   return (
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.92)', padding: 20 }}
@@ -223,7 +205,11 @@ export default function AuthModal({ dark, onClose, onLoginSuccess, shops }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <Input type="email" placeholder="Email Address" value={email}
                 onChange={e => setEmail(e.target.value)} required dark={dark} />
-              <PwField placeholder="Password" value={pass} onChange={e => setPass(e.target.value)} show={showPw} onToggle={() => setShowPw(v => !v)} />
+              
+              {/* Uses the native `type="password"` from the robust UI components */}
+              <Input type="password" placeholder="Password" value={pass} 
+                onChange={e => setPass(e.target.value)} required dark={dark} />
+              
               <Btn type="submit" color="black" full disabled={loading || !email || !pass}>
                 {loading ? 'Verifying…' : 'Sign In'}
               </Btn>
@@ -297,11 +283,13 @@ export default function AuthModal({ dark, onClose, onLoginSuccess, shops }) {
               <Input type="email" placeholder="Email Address" value={sEmail}
                 onChange={e => setSEmail(e.target.value)} required dark={dark} />
 
-              <PwField placeholder="Set Password (min 6 chars)" value={sPass} onChange={e => setSPass(e.target.value)} show={showSPw} onToggle={() => setShowSPw(v => !v)} />
+              <Input type="password" placeholder="Set Password (min 6 chars)" value={sPass} 
+                onChange={e => setSPass(e.target.value)} required dark={dark} />
               <PasswordStrength password={sPass} />
 
-              <Input type={showSPw ? 'text' : 'password'} placeholder="Confirm Password"
+              <Input type="password" placeholder="Confirm Password"
                 value={sPass2} onChange={e => setSPass2(e.target.value)} required dark={dark} />
+              
               {sPass2 && sPass !== sPass2 && (
                 <p style={{ fontFamily: ff, fontWeight: 700, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#ef4444', margin: '-4px 0 0' }}>
                   Passwords do not match
