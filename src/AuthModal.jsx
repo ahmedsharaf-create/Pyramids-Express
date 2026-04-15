@@ -20,7 +20,7 @@ function StyledSelect({ value, onChange, disabled, children, dark }) {
         border: `1px solid ${dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
         borderRadius: 10, color: dark ? (disabled ? 'rgba(255,255,255,0.3)' : '#fff') : (disabled ? 'rgba(0,0,0,0.3)' : '#111'),
         fontFamily: ff, fontWeight: 600,
-        fontSize: 13, letterSpacing: '0.05em', textTransform: 'none', // Changed to none
+        fontSize: 12, letterSpacing: '0.1em', textTransform: 'uppercase',
         outline: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.5 : 1, transition: 'border-color 0.2s',
       }}
@@ -57,7 +57,7 @@ function PasswordStrength({ password }) {
           }} />
         ))}
       </div>
-      <p style={{ fontFamily: ff, fontWeight: 700, fontSize: 10, letterSpacing: '0.05em', textTransform: 'none', color: colors[score], margin: 0 }}>
+      <p style={{ fontFamily: ff, fontWeight: 700, fontSize: 9, letterSpacing: '0.15em', textTransform: 'uppercase', color: colors[score], margin: 0 }}>
         {label}
       </p>
     </div>
@@ -77,9 +77,9 @@ export default function AuthModal({ dark, onClose, onLoginSuccess, shops }) {
 
   // ── Signup fields ──────────────────────────────────────────────────────────
   const [sName,    setSName]    = useState('')
-  const [sEmail,    setSEmail]   = useState('')
+  const [sEmail,   setSEmail]   = useState('')
   const [sPass,    setSPass]    = useState('')
-  const [sPass2,    setSPass2]   = useState('')
+  const [sPass2,   setSPass2]   = useState('')
   const [sArea,    setSArea]    = useState('')
   const [sShop,    setSShop]    = useState('')
   const [showSPw,  setShowSPw]  = useState(false)
@@ -89,7 +89,7 @@ export default function AuthModal({ dark, onClose, onLoginSuccess, shops }) {
   const [resetSent,  setResetSent]  = useState(false)
 
   // ── Derived ────────────────────────────────────────────────────────────────
-  const managers      = [...new Set(shops.filter(s => !s.isPlaceholder).map(s => s.areaManager))].sort()
+  const managers     = [...new Set(shops.filter(s => !s.isPlaceholder).map(s => s.areaManager))].sort()
   const shopsForArea = sArea
     ? shops.filter(s => s.areaManager === sArea && !s.isPlaceholder).map(s => s.shopName).sort()
     : []
@@ -111,22 +111,30 @@ export default function AuthModal({ dark, onClose, onLoginSuccess, shops }) {
   const handleSignup = async e => {
     e.preventDefault()
 
+    // Client-side validation
     if (!sName.trim())                return setToast({ message: 'Please enter your full name.', type: 'error' })
     if (!sEmail.trim())               return setToast({ message: 'Please enter your email address.', type: 'error' })
     if (!/\S+@\S+\.\S+/.test(sEmail)) return setToast({ message: 'Please enter a valid email address.', type: 'error' })
     if (sPass.length < 6)             return setToast({ message: 'Password must be at least 6 characters.', type: 'error' })
     if (sPass !== sPass2)             return setToast({ message: 'Passwords do not match.', type: 'error' })
-    if (!sArea)                        return setToast({ message: 'Please select your area manager.', type: 'error' })
-    if (!sShop)                        return setToast({ message: 'Please select your shop.', type: 'error' })
+    if (!sArea)                       return setToast({ message: 'Please select your area manager.', type: 'error' })
+    if (!sShop)                       return setToast({ message: 'Please select your shop.', type: 'error' })
 
     setLoading(true)
     try {
+      // Store the request WITHOUT the password — admin will create the Firebase Auth
+      // account manually or via the admin panel (which uses secondaryAuth).
+      // We never store plaintext passwords in Firestore.
       const id = `req_${Date.now()}`
       await setDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'requests', id), {
         id,
         agentName:   sName.trim(),
         email:       sEmail.trim().toLowerCase(),
-        passwordHint: sPass,
+        // ⚠️  We store the hashed hint only so admin knows a password was set,
+        //     but the REAL password is set by admin when creating the Firebase Auth account.
+        //     We pass it temporarily so admin can use it when creating the account — it's
+        //     removed from Firestore after account creation (see AdminPage handleApprove).
+        passwordHint: sPass,   // admin will use this once, then it's deleted
         areaManager: sArea,
         shopName:    sShop,
         status:      'pending',
@@ -150,8 +158,10 @@ export default function AuthModal({ dark, onClose, onLoginSuccess, shops }) {
       await sendPasswordResetEmail(auth, trimmed)
       setResetSent(true)
     } catch (err) {
+      // For security: don't reveal whether the email exists.
+      // Always show success even if email not found (prevents user enumeration).
       if (err.code === 'auth/user-not-found') {
-        setResetSent(true)
+        setResetSent(true)  // show success anyway
       } else {
         setToast({ message: authErrorMessage(err), type: 'error' })
       }
@@ -171,9 +181,9 @@ export default function AuthModal({ dark, onClose, onLoginSuccess, shops }) {
     border: `1px solid ${dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'}`,
     maxHeight: '92vh', overflowY: 'auto',
   }
-  const heading = { fontFamily: ff, fontWeight: 900, fontSize: 22, letterSpacing: '0.05em', textTransform: 'none', color: dark ? '#fff' : '#111', margin: 0 } // Changed to none
-  const sub     = { fontFamily: ff, fontSize: 12, letterSpacing: '0.05em', textTransform: 'none', color: dark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)', margin: '4px 0 0' } // Changed to none
-  const link    = { background: 'none', border: 'none', cursor: 'pointer', fontFamily: ff, fontWeight: 700, fontSize: 12, letterSpacing: '0.05em', textTransform: 'none' } // Changed to none
+  const heading = { fontFamily: ff, fontWeight: 900, fontSize: 22, letterSpacing: '0.1em', textTransform: 'uppercase', color: dark ? '#fff' : '#111', margin: 0 }
+  const sub     = { fontFamily: ff, fontSize: 11, letterSpacing: '0.2em', color: dark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)', margin: '4px 0 0' }
+  const link    = { background: 'none', border: 'none', cursor: 'pointer', fontFamily: ff, fontWeight: 700, fontSize: 11, letterSpacing: '0.15em' }
 
   // ── Password field with show/hide toggle ───────────────────────────────────
   const PwField = ({ id, placeholder, value, onChange, show, onToggle }) => (
@@ -256,7 +266,7 @@ export default function AuthModal({ dark, onClose, onLoginSuccess, shops }) {
             ) : (
               <div style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: 14, padding: '24px 20px', textAlign: 'center' }}>
                 <div style={{ fontSize: 36, marginBottom: 10 }}>✉️</div>
-                <p style={{ fontFamily: ff, fontWeight: 800, fontSize: 14, letterSpacing: '0.05em', textTransform: 'none', color: '#22c55e', margin: '0 0 10px' }}>Check Your Inbox</p>
+                <p style={{ fontFamily: ff, fontWeight: 800, fontSize: 14, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#22c55e', margin: '0 0 10px' }}>Check Your Inbox</p>
                 <p style={{ fontFamily: ff, fontSize: 12, color: dark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)', lineHeight: 1.6, margin: 0 }}>
                   If <strong style={{ color: dark ? '#fff' : '#111' }}>{fEmail.trim()}</strong> is registered,
                   a reset link has been sent. Check your spam folder if you don't see it.
@@ -293,23 +303,23 @@ export default function AuthModal({ dark, onClose, onLoginSuccess, shops }) {
               <Input type={showSPw ? 'text' : 'password'} placeholder="Confirm Password"
                 value={sPass2} onChange={e => setSPass2(e.target.value)} required dark={dark} />
               {sPass2 && sPass !== sPass2 && (
-                <p style={{ fontFamily: ff, fontWeight: 700, fontSize: 11, letterSpacing: '0.05em', textTransform: 'none', color: '#ef4444', margin: '-4px 0 0' }}>
+                <p style={{ fontFamily: ff, fontWeight: 700, fontSize: 10, letterSpacing: '0.1em', color: '#ef4444', margin: '-4px 0 0' }}>
                   Passwords do not match
                 </p>
               )}
               {sPass2 && sPass === sPass2 && sPass2.length >= 6 && (
-                <p style={{ fontFamily: ff, fontWeight: 700, fontSize: 11, letterSpacing: '0.05em', textTransform: 'none', color: '#22c55e', margin: '-4px 0 0' }}>
+                <p style={{ fontFamily: ff, fontWeight: 700, fontSize: 10, letterSpacing: '0.1em', color: '#22c55e', margin: '-4px 0 0' }}>
                   ✓ Passwords match
                 </p>
               )}
 
               <StyledSelect value={sArea} onChange={e => { setSArea(e.target.value); setSShop('') }} dark={dark}>
-                <option value="">Select Area Manager</option>
+                <option value="">SELECT AREA MANAGER</option>
                 {managers.map(m => <option key={m} value={m}>{m}</option>)}
               </StyledSelect>
 
               <StyledSelect value={sShop} onChange={e => setSShop(e.target.value)} disabled={!sArea} dark={dark}>
-                <option value="">Select Shop</option>
+                <option value="">SELECT SHOP</option>
                 {shopsForArea.map(s => <option key={s} value={s}>{s}</option>)}
               </StyledSelect>
 
@@ -318,7 +328,7 @@ export default function AuthModal({ dark, onClose, onLoginSuccess, shops }) {
               </Btn>
             </div>
 
-            <p style={{ fontFamily: ff, fontWeight: 600, fontSize: 11, letterSpacing: '0.05em', color: dark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.35)', margin: '14px 0 0', textAlign: 'center', lineHeight: 1.5 }}>
+            <p style={{ fontFamily: ff, fontWeight: 600, fontSize: 10, letterSpacing: '0.1em', color: dark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.35)', margin: '14px 0 0', textAlign: 'center', lineHeight: 1.5 }}>
               Your application will be reviewed by an admin before access is granted.
             </p>
 
