@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
-import { db, APP_ID } from './firebase.js'
-import { doc, setDoc, deleteDoc, collection } from 'firebase/firestore'
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
+import { db, APP_ID, secondaryAuth, authErrorMessage } from './firebase.js'
+import { doc, setDoc, updateDoc, deleteDoc, collection } from 'firebase/firestore'
 import { Icon, Btn, Input, Select, Card, Toast } from './ui.jsx'
 import { RetailMapAdmin } from './RetailMapPage.jsx'
 
@@ -88,31 +89,69 @@ export default function AdminPage({ dark, state, onView, setToast }) {
   const handleCreateUser = async e => {
     e.preventDefault()
     if (!createForm.area || !createForm.shop) { setToast({ message: 'Select area and shop', type: 'error' }); return }
+    if (!createForm.email || !createForm.pass) { setToast({ message: 'Email and password are required', type: 'error' }); return }
+    if (createForm.pass.length < 6) { setToast({ message: 'Password must be at least 6 characters', type: 'error' }); return }
     setLoading(true)
     try {
-      const id = Date.now().toString()
-      await setDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'users', id), {
-        email: createForm.email, password: createForm.pass,
-        agentName: createForm.name, areaManager: createForm.area,
-        shopName: createForm.shop, approvedAt: new Date().toISOString(), createdBy: 'Admin',
+      // Create real Firebase Auth account using secondary app (keeps admin session intact)
+      const cred = await createUserWithEmailAndPassword(
+        secondaryAuth,
+        createForm.email.trim().toLowerCase(),
+        createForm.pass
+      )
+      // Set display name
+      await updateProfile(cred.user, { displayName: createForm.name.trim() })
+      // Sign out of secondary app immediately — we only needed it for account creation
+      await secondaryAuth.signOut()
+
+      // Store profile data in Firestore (NO password stored)
+      await setDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'users', cred.user.uid), {
+        uid:         cred.user.uid,
+        email:       createForm.email.trim().toLowerCase(),
+        agentName:   createForm.name.trim(),
+        areaManager: createForm.area,
+        shopName:    createForm.shop,
+        approvedAt:  new Date().toISOString(),
+        createdBy:   'Admin',
       })
-      setToast({ message: 'Agent account created!', type: 'success' })
+      setToast({ message: 'Agent account created successfully!', type: 'success' })
       setCreateForm({ name: '', email: '', pass: '', area: '', shop: '' })
-    } catch (err) { setToast({ message: 'Failed: ' + err.message, type: 'error' })
+    } catch (err) {
+      setToast({ message: authErrorMessage(err), type: 'error' })
     } finally { setLoading(false) }
   }
 
   const handleApprove = async req => {
+    if (!req.passwordHint || req.passwordHint.length < 6) {
+      setToast({ message: 'Cannot approve — password in request is missing or too short. Ask the agent to re-apply.', type: 'error' })
+      return
+    }
     try {
-      const id = Date.now().toString()
-      await setDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'users', id), {
-        email: req.email, password: req.password || 'reset-needed',
-        agentName: req.agentName, areaManager: req.areaManager,
-        shopName: req.shopName, approvedAt: new Date().toISOString(),
+      // Create real Firebase Auth account using secondary app (keeps admin session intact)
+      const cred = await createUserWithEmailAndPassword(
+        secondaryAuth,
+        req.email.trim().toLowerCase(),
+        req.passwordHint
+      )
+      await updateProfile(cred.user, { displayName: req.agentName })
+      await secondaryAuth.signOut()
+
+      // Store profile in Firestore (NO password)
+      await setDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'users', cred.user.uid), {
+        uid:         cred.user.uid,
+        email:       req.email.trim().toLowerCase(),
+        agentName:   req.agentName,
+        areaManager: req.areaManager,
+        shopName:    req.shopName,
+        approvedAt:  new Date().toISOString(),
       })
+
+      // Delete the request (which contained the temporary passwordHint)
       await deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'requests', req.id))
-      setToast({ message: 'Agent approved!', type: 'success' })
-    } catch (err) { setToast({ message: 'Approval failed', type: 'error' }) }
+      setToast({ message: `Agent "${req.agentName}" approved and account created!`, type: 'success' })
+    } catch (err) {
+      setToast({ message: authErrorMessage(err), type: 'error' })
+    }
   }
 
   const handleReject = async id => {
