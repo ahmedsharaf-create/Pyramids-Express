@@ -69,7 +69,7 @@ export function Toast({ message, type, onClose }) {
       borderLeft: `4px solid ${accent}`,
       padding: '14px 20px', borderRadius: 12, maxWidth: 340,
       fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: '0.05em',
-      fontSize: 13, fontWeight: 600, textTransform: 'uppercase',
+      fontSize: 13, fontWeight: 600, textTransform: 'none',
       boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
       animation: 'slideUp 0.3s ease',
     }}>
@@ -86,7 +86,7 @@ export function Input({ type = 'text', placeholder, value, onChange, required, d
     border: `1px solid ${dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
     borderRadius: 10, color: dark ? '#fff' : '#111',
     fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600,
-    fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase',
+    fontSize: 12, letterSpacing: '0.12em', textTransform: 'none',
     outline: 'none', transition: 'border-color 0.2s',
     opacity: disabled ? 0.5 : 1, cursor: disabled ? 'not-allowed' : 'text',
   }
