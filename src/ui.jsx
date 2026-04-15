@@ -42,6 +42,29 @@ const PATHS = {
   gitBranch:  "M6 3a3 3 0 100 6 3 3 0 000-6zM18 15a3 3 0 100 6 3 3 0 000-6zM6 21V9m12 0V6m0 0a3 3 0 100 6 3 3 0 000-6zM6 9a9 9 0 0012 8.46",
 }
 
+// ─── Global Styles for Pure CSS States ────────────────────────────────────────
+// Using native CSS to handle focus/hover prevents React from re-rendering the 
+// component on focus/blur events, perfectly solving the cursor-drop bug!
+const GlobalStyles = () => (
+  <style>{`
+    .smooth-input:focus {
+      border-color: #ef4444 !important;
+    }
+    .eye-toggle:hover {
+      color: #111 !important;
+    }
+    .eye-toggle-dark:hover {
+      color: #fff !important;
+    }
+    .smooth-btn:hover {
+      opacity: 0.82;
+    }
+    .smooth-btn:active {
+      transform: scale(0.97);
+    }
+  `}</style>
+)
+
 export function Icon({ name, size = 20, className = '', style = {} }) {
   return (
     <svg
@@ -79,10 +102,8 @@ export function Toast({ message, type, onClose }) {
 }
 
 // ─── Input ────────────────────────────────────────────────────────────────────
-// Updated to automatically handle `type="password"` with a smooth show/hide toggle.
 export function Input({ type = 'text', name, id, placeholder, value, onChange, required, dark, disabled }) {
   const [showPassword, setShowPassword] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
   
   // Determine input type and specific spacing
   const isPassword = type === 'password';
@@ -94,7 +115,7 @@ export function Input({ type = 'text', name, id, placeholder, value, onChange, r
     padding: '11px 14px',
     paddingRight: isPassword ? '40px' : '14px', // Space for the eye icon
     background: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-    border: `1px solid ${isFocused ? '#ef4444' : (dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)')}`,
+    border: `1px solid ${dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
     borderRadius: 10, 
     color: dark ? '#fff' : '#111',
     fontFamily: "'Barlow Condensed', sans-serif", 
@@ -111,20 +132,21 @@ export function Input({ type = 'text', name, id, placeholder, value, onChange, r
   return (
     <div style={{ position: 'relative', width: '100%' }}>
       <input
+        className="smooth-input"
         id={id}
         name={name}
         type={currentType} 
         placeholder={placeholder} 
-        value={value}
+        // Ensure controlled component status is stable by fallbacking to ''
+        value={value !== undefined ? value : ''}
         onChange={onChange} 
         required={required} 
         disabled={disabled}
         style={base}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
       />
       {isPassword && (
         <div 
+          className={dark ? "eye-toggle-dark" : "eye-toggle"}
           onClick={() => setShowPassword(!showPassword)}
           style={{
             position: 'absolute',
@@ -138,8 +160,6 @@ export function Input({ type = 'text', name, id, placeholder, value, onChange, r
             justifyContent: 'center',
             transition: 'color 0.2s'
           }}
-          onMouseEnter={e => e.currentTarget.style.color = dark ? '#fff' : '#111'}
-          onMouseLeave={e => e.currentTarget.style.color = dark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)'}
         >
           <Icon name={showPassword ? 'eyeOff' : 'eye'} size={18} />
         </div>
@@ -152,6 +172,7 @@ export function Input({ type = 'text', name, id, placeholder, value, onChange, r
 export function Select({ value, onChange, children, dark, disabled }) {
   return (
     <select
+      className="smooth-input"
       value={value} onChange={onChange} disabled={disabled}
       style={{
         width: '100%', padding: '11px 14px',
@@ -162,6 +183,7 @@ export function Select({ value, onChange, children, dark, disabled }) {
         fontSize: 12, letterSpacing: '0.12em', textTransform: 'none',
         outline: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.5 : 1,
+        transition: 'border-color 0.2s'
       }}
     >
       {children}
@@ -177,6 +199,7 @@ export function Btn({ children, onClick, type = 'button', color = 'red', full = 
   }[color] || '#ef4444'
   return (
     <button
+      className="smooth-btn"
       type={type} onClick={onClick} disabled={disabled}
       style={{
         width: full ? '100%' : 'auto',
@@ -192,10 +215,6 @@ export function Btn({ children, onClick, type = 'button', color = 'red', full = 
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
         ...extraStyle,
       }}
-      onMouseEnter={e => !disabled && (e.currentTarget.style.opacity = '0.82')}
-      onMouseLeave={e => !disabled && (e.currentTarget.style.opacity = '1')}
-      onMouseDown={e => !disabled && (e.currentTarget.style.transform = 'scale(0.97)')}
-      onMouseUp={e => !disabled && (e.currentTarget.style.transform = 'scale(1)')}
     >
       {children}
     </button>
@@ -222,47 +241,50 @@ export default function App() {
   const [password, setPassword] = useState('');
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: '#fafafa',
-      padding: '20px',
-      fontFamily: 'sans-serif'
-    }}>
-      <Card dark={false} style={{ width: '100%', maxWidth: '360px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
-        <h2 style={{ margin: '0 0 24px 0', fontSize: '20px', color: '#111', fontFamily: "'Barlow Condensed', sans-serif" }}>
-          Welcome Back
-        </h2>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div>
-            <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold', color: '#666' }}>Email</label>
-            <Input 
-              name="email"
-              placeholder="name@example.com" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
+    <>
+      <GlobalStyles />
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#fafafa',
+        padding: '20px',
+        fontFamily: 'sans-serif'
+      }}>
+        <Card dark={false} style={{ width: '100%', maxWidth: '360px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+          <h2 style={{ margin: '0 0 24px 0', fontSize: '20px', color: '#111', fontFamily: "'Barlow Condensed', sans-serif" }}>
+            Welcome Back
+          </h2>
           
-          <div>
-            <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold', color: '#666' }}>Password</label>
-            <Input 
-              type="password" 
-              name="password"
-              placeholder="Enter your password" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold', color: '#666' }}>Email</label>
+              <Input 
+                name="email"
+                placeholder="name@example.com" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            
+            <div>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold', color: '#666' }}>Password</label>
+              <Input 
+                type="password" 
+                name="password"
+                placeholder="Enter your password" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
 
-          <Btn full={true} style={{ marginTop: '8px' }}>
-            <Icon name="key" size={16} /> Sign In
-          </Btn>
-        </div>
-      </Card>
-    </div>
+            <Btn full={true} style={{ marginTop: '8px' }}>
+              <Icon name="key" size={16} /> Sign In
+            </Btn>
+          </div>
+        </Card>
+      </div>
+    </>
   )
 }
