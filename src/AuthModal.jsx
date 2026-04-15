@@ -182,8 +182,8 @@ export default function AuthModal({ dark, onClose, onLoginSuccess, shops }) {
     maxHeight: '92vh', overflowY: 'auto',
   }
   const heading = { fontFamily: ff, fontWeight: 900, fontSize: 22, letterSpacing: '0.1em', textTransform: 'uppercase', color: dark ? '#fff' : '#111', margin: 0 }
-  const sub     = { fontFamily: ff, fontSize: 11, letterSpacing: '0.2em', color: dark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)', margin: '4px 0 0' }
-  const link    = { background: 'none', border: 'none', cursor: 'pointer', fontFamily: ff, fontWeight: 700, fontSize: 11, letterSpacing: '0.15em' }
+  const sub     = { fontFamily: ff, fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: dark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)', margin: '4px 0 0' }
+  const link    = { background: 'none', border: 'none', cursor: 'pointer', fontFamily: ff, fontWeight: 700, fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase' }
 
   // ── Password field with show/hide toggle ───────────────────────────────────
   const PwField = ({ id, placeholder, value, onChange, show, onToggle }) => (
@@ -303,12 +303,12 @@ export default function AuthModal({ dark, onClose, onLoginSuccess, shops }) {
               <Input type={showSPw ? 'text' : 'password'} placeholder="Confirm Password"
                 value={sPass2} onChange={e => setSPass2(e.target.value)} required dark={dark} />
               {sPass2 && sPass !== sPass2 && (
-                <p style={{ fontFamily: ff, fontWeight: 700, fontSize: 10, letterSpacing: '0.1em', color: '#ef4444', margin: '-4px 0 0' }}>
+                <p style={{ fontFamily: ff, fontWeight: 700, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#ef4444', margin: '-4px 0 0' }}>
                   Passwords do not match
                 </p>
               )}
               {sPass2 && sPass === sPass2 && sPass2.length >= 6 && (
-                <p style={{ fontFamily: ff, fontWeight: 700, fontSize: 10, letterSpacing: '0.1em', color: '#22c55e', margin: '-4px 0 0' }}>
+                <p style={{ fontFamily: ff, fontWeight: 700, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#22c55e', margin: '-4px 0 0' }}>
                   ✓ Passwords match
                 </p>
               )}
