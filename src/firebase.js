@@ -3,6 +3,8 @@ import {
   getAuth,
   setPersistence,
   browserLocalPersistence,
+  indexedDBLocalPersistence,
+  inMemoryPersistence,
 } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 
@@ -17,23 +19,39 @@ const firebaseConfig = {
 
 export const APP_ID = 'pyramids-express-52a27'
 
-// ── Primary app — used for all normal app operations ─────────────────────────
+// ── Primary app ───────────────────────────────────────────────────────────────
 export const app  = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
 export const db   = getFirestore(app)
 
-// ── Secondary app — used ONLY by admin to create new user accounts ────────────
-// This is necessary so that createUserWithEmailAndPassword doesn't switch the
-// currently logged-in admin session to the newly created account.
+// ── Secondary app — admin-only, used just for createUserWithEmailAndPassword ──
+// Uses inMemoryPersistence so it NEVER stores a session — it signs in, creates
+// the account, then signOut() is called immediately. No session conflict.
 export const secondaryApp  = initializeApp(firebaseConfig, 'secondary')
 export const secondaryAuth = getAuth(secondaryApp)
 
-// ── Keep auth session alive across page refreshes ────────────────────────────
-setPersistence(auth, browserLocalPersistence).catch(err => {
-  console.warn('Auth persistence error:', err)
-})
+// ── Persist the primary auth session across page refreshes ───────────────────
+// We try indexedDB first (more reliable in all browsers), then fall back to
+// localStorage. Both survive page refreshes and tab closes.
+// This runs synchronously at module load time so it's set before any auth call.
+;(async () => {
+  try {
+    await setPersistence(auth, indexedDBLocalPersistence)
+  } catch {
+    try {
+      await setPersistence(auth, browserLocalPersistence)
+    } catch (err) {
+      console.warn('Auth persistence could not be set:', err.message)
+    }
+  }
 
-// ── Human-readable error messages for Firebase Auth error codes ───────────────
+  // Secondary auth should NEVER persist — in-memory only
+  try {
+    await setPersistence(secondaryAuth, inMemoryPersistence)
+  } catch { /* ignore */ }
+})()
+
+// ── Human-readable Firebase Auth error messages ───────────────────────────────
 export function authErrorMessage(err) {
   const code = err?.code || ''
   const map = {
