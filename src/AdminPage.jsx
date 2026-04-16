@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
+import { createUserWithEmailAndPassword, updateProfile, signOut } from 'firebase/auth'
 import { db, APP_ID, secondaryAuth, authErrorMessage } from './firebase.js'
 import { doc, setDoc, updateDoc, deleteDoc, collection } from 'firebase/firestore'
-import { Icon, Btn, Input, Select, Card, Toast } from './ui.jsx'
+import { Icon, Btn, Input, Select, Card, Toast, GlobalStyles } from './ui.jsx'
 import { RetailMapAdmin } from './RetailMapPage.jsx'
 
 const ff = "'Barlow Condensed', sans-serif"
@@ -102,7 +102,8 @@ export default function AdminPage({ dark, state, onView, setToast }) {
       // Set display name
       await updateProfile(cred.user, { displayName: createForm.name.trim() })
       // Sign out of secondary app immediately — we only needed it for account creation
-      await secondaryAuth.signOut()
+      // Sign out of secondary app — we only needed it for account creation
+      await signOut(secondaryAuth)
 
       // Store profile data in Firestore (NO password stored)
       await setDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'users', cred.user.uid), {
@@ -114,6 +115,15 @@ export default function AdminPage({ dark, state, onView, setToast }) {
         approvedAt:  new Date().toISOString(),
         createdBy:   'Admin',
       })
+
+      // Write approval notification so agent sees a banner on next login
+      await setDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'approval_notifications', cred.user.uid), {
+        agentName:  createForm.name.trim(),
+        email:      createForm.email.trim().toLowerCase(),
+        dismissed:  false,
+        approvedAt: new Date().toISOString(),
+      })
+
       setToast({ message: 'Agent account created successfully!', type: 'success' })
       setCreateForm({ name: '', email: '', pass: '', area: '', shop: '' })
     } catch (err) {
@@ -134,7 +144,8 @@ export default function AdminPage({ dark, state, onView, setToast }) {
         req.passwordHint
       )
       await updateProfile(cred.user, { displayName: req.agentName })
-      await secondaryAuth.signOut()
+      // Sign out of secondary app — we only needed it for account creation
+      await signOut(secondaryAuth)
 
       // Store profile in Firestore (NO password)
       await setDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'users', cred.user.uid), {
@@ -146,9 +157,17 @@ export default function AdminPage({ dark, state, onView, setToast }) {
         approvedAt:  new Date().toISOString(),
       })
 
-      // Delete the request (which contained the temporary passwordHint)
+      // Write approval notification — agent sees a welcome banner on next login
+      await setDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'approval_notifications', cred.user.uid), {
+        agentName:  req.agentName,
+        email:      req.email.trim().toLowerCase(),
+        dismissed:  false,
+        approvedAt: new Date().toISOString(),
+      })
+
+      // Delete the request (removes the temporary passwordHint from Firestore)
       await deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'requests', req.id))
-      setToast({ message: `Agent "${req.agentName}" approved and account created!`, type: 'success' })
+      setToast({ message: `Agent "${req.agentName}" approved — account is now active!`, type: 'success' })
     } catch (err) {
       setToast({ message: authErrorMessage(err), type: 'error' })
     }
