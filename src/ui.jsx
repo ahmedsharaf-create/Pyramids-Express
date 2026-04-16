@@ -40,27 +40,44 @@ const PATHS = {
   calendar:   "M3 9h18M3 5h18a2 2 0 012 2v14a2 2 0 01-2 2H3a2 2 0 01-2-2V7a2 2 0 012-2zM8 3v4M16 3v4",
   trendUp:    "M23 6l-9.5 9.5-5-5L1 18M17 6h6v6",
   gitBranch:  "M6 3a3 3 0 100 6 3 3 0 000-6zM18 15a3 3 0 100 6 3 3 0 000-6zM6 21V9m12 0V6m0 0a3 3 0 100 6 3 3 0 000-6zM6 9a9 9 0 0012 8.46",
+  bell:       "M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0",
+  checkCircle:"M22 11.08V12a10 10 0 11-5.93-9.14M22 4L12 14.01l-3-3",
 }
 
-// ─── Global Styles for Pure CSS States ────────────────────────────────────────
-// Using native CSS to handle focus/hover prevents React from re-rendering the 
-// component on focus/blur events, perfectly solving the cursor-drop bug!
-const GlobalStyles = () => (
+// ─── Global CSS for focus/hover states ────────────────────────────────────────
+// Using pure CSS prevents React re-renders on focus/blur which causes cursor jumps
+export const GlobalStyles = () => (
   <style>{`
-    .smooth-input:focus {
-      border-color: #ef4444 !important;
+    .pe-input:focus { border-color: #ef4444 !important; outline: none; }
+    .pe-select:focus { border-color: #ef4444 !important; outline: none; }
+    .pe-btn { transition: opacity 0.2s, transform 0.1s; }
+    .pe-btn:hover:not(:disabled) { opacity: 0.82; }
+    .pe-btn:active:not(:disabled) { transform: scale(0.97); }
+    .pe-eye:hover { color: #ef4444 !important; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
-    .eye-toggle:hover {
-      color: #111 !important;
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
-    .eye-toggle-dark:hover {
-      color: #fff !important;
+    @keyframes progressPulse {
+      0%   { width: 0%;   margin-left: 0; }
+      50%  { width: 65%;  margin-left: 0; }
+      100% { width: 0%;   margin-left: 100%; }
     }
-    .smooth-btn:hover {
-      opacity: 0.82;
+    @keyframes gridScroll {
+      0%   { background-position: 0 0; }
+      100% { background-position: 40px 40px; }
     }
-    .smooth-btn:active {
-      transform: scale(0.97);
+    @keyframes blobPulse {
+      0%,100% { transform: scale(1);   opacity: 0.8; }
+      50%     { transform: scale(1.4); opacity: 1;   }
+    }
+    @keyframes iconPulse {
+      0%,100% { box-shadow: 0 0 24px rgba(239,68,68,0.2); }
+      50%     { box-shadow: 0 0 48px rgba(239,68,68,0.45); }
     }
   `}</style>
 )
@@ -81,7 +98,7 @@ export function Icon({ name, size = 20, className = '', style = {} }) {
 // ─── Toast ────────────────────────────────────────────────────────────────────
 export function Toast({ message, type, onClose }) {
   useEffect(() => {
-    const t = setTimeout(onClose, 4500)
+    const t = setTimeout(onClose, 5000)
     return () => clearTimeout(t)
   }, [onClose])
   const accent = type === 'error' ? '#ef4444' : type === 'success' ? '#22c55e' : '#f97316'
@@ -90,79 +107,65 @@ export function Toast({ message, type, onClose }) {
       position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
       background: '#111', color: '#fff',
       borderLeft: `4px solid ${accent}`,
-      padding: '14px 20px', borderRadius: 12, maxWidth: 340,
-      fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: '0.05em',
-      fontSize: 13, fontWeight: 600, textTransform: 'none',
+      padding: '14px 20px', borderRadius: 12, maxWidth: 360,
+      fontFamily: "'Barlow Condensed', sans-serif",
+      fontSize: 13, fontWeight: 600,
       boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
       animation: 'slideUp 0.3s ease',
+      lineHeight: 1.4,
     }}>
       {message}
     </div>
   )
 }
 
-// ─── Input ────────────────────────────────────────────────────────────────────
+// ─── Input — password show/hide built-in ─────────────────────────────────────
 export function Input({ type = 'text', name, id, placeholder, value, onChange, required, dark, disabled }) {
-  const [showPassword, setShowPassword] = useState(false);
-  
-  // Determine input type and specific spacing
-  const isPassword = type === 'password';
-  const currentType = isPassword ? (showPassword ? 'text' : 'password') : type;
-
-  const base = {
-    width: '100%', 
-    boxSizing: 'border-box',
-    padding: '11px 14px',
-    paddingRight: isPassword ? '40px' : '14px', // Space for the eye icon
-    background: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-    border: `1px solid ${dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
-    borderRadius: 10, 
-    color: dark ? '#fff' : '#111',
-    fontFamily: "'Barlow Condensed', sans-serif", 
-    fontWeight: 600,
-    fontSize: 12, 
-    letterSpacing: isPassword && !showPassword ? '0.25em' : '0.12em', // Give password dots breathing room
-    textTransform: 'none',
-    outline: 'none', 
-    transition: 'border-color 0.2s',
-    opacity: disabled ? 0.5 : 1, 
-    cursor: disabled ? 'not-allowed' : 'text',
-  }
+  const [showPassword, setShowPassword] = useState(false)
+  const isPassword   = type === 'password'
+  const currentType  = isPassword ? (showPassword ? 'text' : 'password') : type
 
   return (
     <div style={{ position: 'relative', width: '100%' }}>
       <input
-        className="smooth-input"
-        id={id}
-        name={name}
-        type={currentType} 
-        placeholder={placeholder} 
-        // Ensure controlled component status is stable by fallbacking to ''
+        className="pe-input"
+        id={id} name={name}
+        type={currentType}
+        placeholder={placeholder}
         value={value !== undefined ? value : ''}
-        onChange={onChange} 
-        required={required} 
+        onChange={onChange}
+        required={required}
         disabled={disabled}
-        style={base}
+        autoComplete={isPassword ? 'current-password' : type === 'email' ? 'email' : 'off'}
+        style={{
+          width: '100%', boxSizing: 'border-box',
+          padding: '11px 14px',
+          paddingRight: isPassword ? '42px' : '14px',
+          background: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+          border: `1px solid ${dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
+          borderRadius: 10, color: dark ? '#fff' : '#111',
+          fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600,
+          fontSize: 12, letterSpacing: '0.1em',
+          outline: 'none', transition: 'border-color 0.2s',
+          opacity: disabled ? 0.5 : 1,
+          cursor: disabled ? 'not-allowed' : 'text',
+        }}
       />
       {isPassword && (
-        <div 
-          className={dark ? "eye-toggle-dark" : "eye-toggle"}
-          onClick={() => setShowPassword(!showPassword)}
+        <button
+          type="button"
+          className="pe-eye"
+          onClick={() => setShowPassword(v => !v)}
+          tabIndex={-1}
           style={{
-            position: 'absolute',
-            right: '12px',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            cursor: 'pointer',
-            color: dark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'color 0.2s'
+            position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+            background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+            color: dark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)',
+            display: 'flex', alignItems: 'center', transition: 'color 0.2s',
           }}
         >
-          <Icon name={showPassword ? 'eyeOff' : 'eye'} size={18} />
-        </div>
+          <Icon name={showPassword ? 'eyeOff' : 'eye'} size={16} />
+        </button>
       )}
     </div>
   )
@@ -172,7 +175,7 @@ export function Input({ type = 'text', name, id, placeholder, value, onChange, r
 export function Select({ value, onChange, children, dark, disabled }) {
   return (
     <select
-      className="smooth-input"
+      className="pe-select"
       value={value} onChange={onChange} disabled={disabled}
       style={{
         width: '100%', padding: '11px 14px',
@@ -180,10 +183,9 @@ export function Select({ value, onChange, children, dark, disabled }) {
         border: `1px solid ${dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
         borderRadius: 10, color: dark ? '#fff' : '#111',
         fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600,
-        fontSize: 12, letterSpacing: '0.12em', textTransform: 'none',
-        outline: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.5 : 1,
-        transition: 'border-color 0.2s'
+        fontSize: 12, letterSpacing: '0.1em',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.5 : 1, transition: 'border-color 0.2s',
       }}
     >
       {children}
@@ -199,19 +201,18 @@ export function Btn({ children, onClick, type = 'button', color = 'red', full = 
   }[color] || '#ef4444'
   return (
     <button
-      className="smooth-btn"
+      className="pe-btn"
       type={type} onClick={onClick} disabled={disabled}
       style={{
         width: full ? '100%' : 'auto',
         padding: small ? '7px 14px' : '12px 22px',
-        background: disabled ? '#333' : bg,
+        background: disabled ? '#444' : bg,
         color: color === 'ghost' ? '#ef4444' : '#fff',
         border: color === 'ghost' ? '1px solid #ef4444' : 'none',
         borderRadius: 10,
         fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800,
-        fontSize: small ? 11 : 13, letterSpacing: '0.15em', textTransform: 'none',
+        fontSize: small ? 11 : 13, letterSpacing: '0.15em', textTransform: 'uppercase',
         cursor: disabled ? 'not-allowed' : 'pointer',
-        transition: 'opacity 0.2s, transform 0.1s',
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
         ...extraStyle,
       }}
@@ -232,59 +233,5 @@ export function Card({ children, dark, style: extra = {} }) {
     }}>
       {children}
     </div>
-  )
-}
-
-// ─── DEMO APP ─────────────────────────────────────────────────────────────────
-export default function App() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-
-  return (
-    <>
-      <GlobalStyles />
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: '#fafafa',
-        padding: '20px',
-        fontFamily: 'sans-serif'
-      }}>
-        <Card dark={false} style={{ width: '100%', maxWidth: '360px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
-          <h2 style={{ margin: '0 0 24px 0', fontSize: '20px', color: '#111', fontFamily: "'Barlow Condensed', sans-serif" }}>
-            Welcome Back
-          </h2>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold', color: '#666' }}>Email</label>
-              <Input 
-                name="email"
-                placeholder="name@example.com" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            
-            <div>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold', color: '#666' }}>Password</label>
-              <Input 
-                type="password" 
-                name="password"
-                placeholder="Enter your password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-
-            <Btn full={true} style={{ marginTop: '8px' }}>
-              <Icon name="key" size={16} /> Sign In
-            </Btn>
-          </div>
-        </Card>
-      </div>
-    </>
   )
 }
