@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { onAuthStateChanged, signInAnonymously, signOut } from 'firebase/auth'
+import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { collection, doc, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore'
 import { auth, db, APP_ID } from './firebase.js'
 import { Icon, Btn, Toast, GlobalStyles } from './ui.jsx'
@@ -103,7 +103,11 @@ export default function App() {
   }
 
   useEffect(() => {
-    signInAnonymously(auth).catch(() => {})
+    // ── IMPORTANT: Do NOT call signInAnonymously here. ────────────────────────
+    // Calling it races against browserLocalPersistence restoring the real user
+    // session from localStorage, which causes the real session to be overwritten
+    // by an anonymous one — signing the user out on every refresh.
+    // Firestore public reads work without anonymous auth when rules allow it.
 
     const unsubAuth = onAuthStateChanged(auth, async user => {
       if (user?.email) {
