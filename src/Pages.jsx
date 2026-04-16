@@ -35,7 +35,7 @@ export function HomePage({ dark, isLoggedIn, onLogin, onNavigate }) {
             borderRadius: 6, fontFamily: ff, fontWeight: 700, fontSize: 11,
             letterSpacing: '0.25em', textTransform: 'uppercase', color: '#fff', marginBottom: 18,
           }}>
-            Partner Orange Egypt
+             Orange Egypt Partner
           </div>
           <h1 style={{
             fontFamily: ff, fontWeight: 900,
