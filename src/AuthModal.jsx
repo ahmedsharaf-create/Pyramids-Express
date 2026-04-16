@@ -306,7 +306,7 @@ export default function AuthModal({ dark, onClose, onLoginSuccess, shops }) {
 
             <div style={{ background: dark ? 'rgba(249,115,22,0.08)' : 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.2)', borderRadius: 12, padding: '14px 16px', marginBottom: 24 }}>
               <p style={{ fontFamily: ff, fontWeight: 600, fontSize: 11, color: '#f97316', margin: 0, lineHeight: 1.6 }}>
-                Once approved, you'll be able to sign in with your email and the password you set. You may need to contact your area manager to confirm approval.
+                Once approved, you'll be able to sign in with your email and the password you set. Wait 24h to be Approuved or contact your area manager to confirm approval.
               </p>
             </div>
 
