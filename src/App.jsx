@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { onAuthStateChanged, signInAnonymously, signOut } from 'firebase/auth'
-import { collection, onSnapshot } from 'firebase/firestore'
+import { collection, doc, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore'
 import { auth, db, APP_ID } from './firebase.js'
-import { Icon, Btn, Toast } from './ui.jsx'
+import { Icon, Btn, Toast, GlobalStyles } from './ui.jsx'
 import AuthModal from './AuthModal.jsx'
 import MediaViewer from './MediaViewer.jsx'
 import AdminPage from './AdminPage.jsx'
@@ -14,13 +14,10 @@ import { RetailMapPage } from './RetailMapPage.jsx'
 
 const ff = "'Barlow Condensed', sans-serif"
 
-// Pages that need a logged-in user
 const AUTH_REQUIRED = [
   'dashboard', 'admin',
   'orange-info', 'corporate', 'incentives', 'medical', 'activities', 'retail-map',
 ]
-
-// Pages that should NOT be restored on refresh if the user is not logged in
 const PRIVATE_PAGES = AUTH_REQUIRED
 
 const INITIAL_STATE = {
@@ -32,171 +29,149 @@ const INITIAL_STATE = {
   users: [], shops: [], requests: [], retailMap: [],
 }
 
-// ─── Splash screen shown while Firebase rehydrates the auth session ───────────
+// ─── Splash ───────────────────────────────────────────────────────────────────
 function AuthSplash({ dark }) {
-  const bg   = dark ? '#0a0a0a' : '#fafafa'
-  const text = dark ? '#fff'    : '#111'
+  const bg = dark ? '#0a0a0a' : '#fafafa'; const text = dark ? '#fff' : '#111'
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 9999,
-      background: bg,
-      display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center', gap: 24,
-    }}>
-      {/* Logo */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 12,
-        fontFamily: ff, fontWeight: 900, fontSize: 22,
-        letterSpacing: '0.15em', textTransform: 'uppercase', color: text,
-      }}>
-        <span style={{
-          background: '#ef4444', color: '#fff',
-          padding: '4px 10px', borderRadius: 6, fontSize: 16,
-        }}>PE</span>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontFamily: ff, fontWeight: 900, fontSize: 22, letterSpacing: '0.15em', textTransform: 'uppercase', color: text }}>
+        <span style={{ background: '#ef4444', color: '#fff', padding: '4px 10px', borderRadius: 6, fontSize: 16 }}>PE</span>
         Pyramids Express
       </div>
-
-      {/* Animated bar */}
-      <div style={{
-        width: 200, height: 3,
-        background: dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)',
-        borderRadius: 99, overflow: 'hidden',
-      }}>
-        <div style={{
-          height: '100%', borderRadius: 99,
-          background: 'linear-gradient(90deg,#ef4444,#f97316)',
-          animation: 'progressPulse 1.6s ease-in-out infinite',
-        }} />
+      <div style={{ width: 200, height: 3, background: dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)', borderRadius: 99, overflow: 'hidden' }}>
+        <div style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg,#ef4444,#f97316)', animation: 'progressPulse 1.6s ease-in-out infinite' }} />
       </div>
-
-      <p style={{
-        fontFamily: ff, fontWeight: 600, fontSize: 11,
-        letterSpacing: '0.22em', textTransform: 'uppercase',
-        color: dark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)',
-        margin: 0,
-      }}>
+      <p style={{ fontFamily: ff, fontWeight: 600, fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', color: dark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)', margin: 0 }}>
         Restoring your session…
       </p>
+    </div>
+  )
+}
 
-      <style>{`
-        @keyframes progressPulse {
-          0%   { width: 0%;   margin-left: 0;    }
-          50%  { width: 65%;  margin-left: 0;    }
-          100% { width: 0%;   margin-left: 100%; }
-        }
-      `}</style>
+// ─── Approval banner — shown once when a newly approved user logs in ──────────
+function ApprovalBanner({ agentName, dark, onDismiss }) {
+  return (
+    <div style={{
+      position: 'fixed', top: 70, left: '50%', transform: 'translateX(-50%)',
+      zIndex: 500, width: '100%', maxWidth: 520, padding: '0 16px',
+      animation: 'slideUp 0.4s ease',
+    }}>
+      <div style={{
+        background: dark ? '#0a2a0a' : '#f0fdf4',
+        border: '1px solid rgba(34,197,94,0.4)',
+        borderRadius: 14, padding: '16px 20px',
+        display: 'flex', alignItems: 'center', gap: 14,
+        boxShadow: '0 8px 32px rgba(34,197,94,0.15)',
+      }}>
+        <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(34,197,94,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#22c55e' }}>
+          <Icon name="checkCircle" size={22} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <p style={{ fontFamily: ff, fontWeight: 900, fontSize: 14, textTransform: 'uppercase', color: '#22c55e', margin: 0 }}>
+            Account Approved!
+          </p>
+          <p style={{ fontFamily: ff, fontWeight: 600, fontSize: 12, color: dark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.55)', margin: '3px 0 0', lineHeight: 1.4 }}>
+            Welcome, {agentName}. Your account has been approved and is now active.
+          </p>
+        </div>
+        <button onClick={onDismiss} style={{ background: 'none', border: 'none', cursor: 'pointer', color: dark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)', flexShrink: 0 }}>
+          <Icon name="x" size={16} />
+        </button>
+      </div>
     </div>
   )
 }
 
 export default function App() {
-  const [dark,      setDark]      = useState(() => localStorage.getItem('pe_dark') === 'true')
-  const [authReady, setAuthReady] = useState(false)   // ← wait for Firebase to rehydrate
-  const [page,      setPage]      = useState('home')  // will be set after auth resolves
-  const [authOpen,  setAuthOpen]  = useState(false)
-  const [viewer,    setViewer]    = useState(null)
-  const [toast,     setToast]     = useState(null)
-  const [appState,  setAppState]  = useState(INITIAL_STATE)
+  const [dark,           setDark]           = useState(() => localStorage.getItem('pe_dark') === 'true')
+  const [authReady,      setAuthReady]      = useState(false)
+  const [page,           setPage]           = useState('home')
+  const [authOpen,       setAuthOpen]       = useState(false)
+  const [viewer,         setViewer]         = useState(null)
+  const [toast,          setToast]          = useState(null)
+  const [approvalBanner, setApprovalBanner] = useState(null) // { agentName, notifId }
+  const [appState,       setAppState]       = useState(INITIAL_STATE)
 
-  // ── Persist dark mode preference ─────────────────────────────────────────
   const toggleDark = () => {
-    setDark(d => {
-      localStorage.setItem('pe_dark', String(!d))
-      return !d
-    })
+    setDark(d => { localStorage.setItem('pe_dark', String(!d)); return !d })
   }
 
-  // ── Navigate — also saves page to localStorage for post-refresh restore ──
-  const navigate = (p) => {
+  const navigate = p => {
     setPage(p)
-    // Only persist non-home pages that need auth, so after refresh we land
-    // on the right page once Firebase confirms the session
-    if (PRIVATE_PAGES.includes(p)) {
-      localStorage.setItem('pe_last_page', p)
-    } else {
-      localStorage.removeItem('pe_last_page')
-    }
+    if (PRIVATE_PAGES.includes(p)) localStorage.setItem('pe_last_page', p)
+    else localStorage.removeItem('pe_last_page')
   }
 
-  // ── Firebase setup ────────────────────────────────────────────────────────
   useEffect(() => {
-    // Anonymous sign-in as fallback for public Firestore reads
-    // (only fires if no real user is already persisted)
     signInAnonymously(auth).catch(() => {})
 
-    const unsubAuth = onAuthStateChanged(auth, user => {
+    const unsubAuth = onAuthStateChanged(auth, async user => {
       if (user?.email) {
-        // Real signed-in user — restore their last page if we have one
-        const isAdmin    = user.email === 'admin@pyramidsexpress.com'
-        const savedPage  = localStorage.getItem('pe_last_page')
-        const targetPage = savedPage || 'dashboard'
+        const isAdmin   = user.email === 'admin@pyramidsexpress.com'
+        const savedPage = localStorage.getItem('pe_last_page')
 
-        setAppState(s => ({
-          ...s, isLoggedIn: true, isAdmin,
-          user: { uid: user.uid, email: user.email, name: isAdmin ? 'System Admin' : 'PE Agent' },
-        }))
-        setPage(targetPage)
+        // ── Load the user's Firestore profile so we have agentName, shopName, etc. ──
+        let profile = { uid: user.uid, email: user.email, name: isAdmin ? 'System Admin' : user.displayName || 'PE Agent' }
+        if (!isAdmin) {
+          try {
+            const snap = await getDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'users', user.uid))
+            if (snap.exists()) {
+              const d = snap.data()
+              profile = {
+                uid:         user.uid,
+                email:       user.email,
+                name:        d.agentName || user.displayName || 'PE Agent',
+                agentName:   d.agentName   || '',
+                shopName:    d.shopName    || '',
+                areaManager: d.areaManager || '',
+              }
+            }
+          } catch (e) { console.warn('Profile load error', e) }
+
+          // ── Check for an approval notification for this user ──────────────
+          try {
+            const notifSnap = await getDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'approval_notifications', user.uid))
+            if (notifSnap.exists()) {
+              const nd = notifSnap.data()
+              if (!nd.dismissed) {
+                setApprovalBanner({ agentName: nd.agentName || profile.name, notifId: user.uid })
+              }
+            }
+          } catch (e) { /* not critical */ }
+        }
+
+        setAppState(s => ({ ...s, isLoggedIn: true, isAdmin, user: profile }))
+        setPage(savedPage || 'dashboard')
       } else {
-        // Anonymous / logged-out — clear saved page, go home
         localStorage.removeItem('pe_last_page')
-        setAppState(s => ({
-          ...s, isLoggedIn: false, isAdmin: false,
-          user: user ? { uid: user.uid } : null,
-        }))
+        setAppState(s => ({ ...s, isLoggedIn: false, isAdmin: false, user: user ? { uid: user.uid } : null }))
         setPage('home')
       }
-
-      // Auth has resolved — hide splash screen
       setAuthReady(true)
     })
 
-    // ── Firestore listeners ──────────────────────────────────────────────
-    const unsubMat = onSnapshot(
-      collection(db, 'artifacts', APP_ID, 'public', 'data', 'materials'),
-      snap => {
-        const m = {
-          'orange-info': [], corporate: [], incentives: [],
-          heroes: [], events: [], medical: [], activities: [],
-        }
-        snap.forEach(d => {
-          const data = d.data()
-          if (m[data.category]) m[data.category].push({ id: d.id, ...data })
-        })
-        setAppState(s => ({ ...s, materials: m }))
-      }
-    )
-
-    const unsubUsers = onSnapshot(
-      collection(db, 'artifacts', APP_ID, 'public', 'data', 'users'),
-      snap => {
-        const users = []; snap.forEach(d => users.push({ id: d.id, ...d.data() }))
-        setAppState(s => ({ ...s, users }))
-      }
-    )
-
-    const unsubShops = onSnapshot(
-      collection(db, 'artifacts', APP_ID, 'public', 'data', 'shops'),
-      snap => {
-        const shops = []; snap.forEach(d => shops.push({ id: d.id, ...d.data() }))
-        setAppState(s => ({ ...s, shops }))
-      }
-    )
-
-    const unsubReqs = onSnapshot(
-      collection(db, 'artifacts', APP_ID, 'public', 'data', 'requests'),
-      snap => {
-        const requests = []; snap.forEach(d => requests.push({ id: d.id, ...d.data() }))
-        setAppState(s => ({ ...s, requests }))
-      }
-    )
-
-    const unsubRetail = onSnapshot(
-      collection(db, 'artifacts', APP_ID, 'public', 'data', 'retail_map'),
-      snap => {
-        const retailMap = []; snap.forEach(d => retailMap.push({ id: d.id, ...d.data() }))
-        setAppState(s => ({ ...s, retailMap }))
-      }
-    )
+    // Firestore listeners
+    const unsubMat = onSnapshot(collection(db, 'artifacts', APP_ID, 'public', 'data', 'materials'), snap => {
+      const m = { 'orange-info': [], corporate: [], incentives: [], heroes: [], events: [], medical: [], activities: [] }
+      snap.forEach(d => { const data = d.data(); if (m[data.category]) m[data.category].push({ id: d.id, ...data }) })
+      setAppState(s => ({ ...s, materials: m }))
+    })
+    const unsubUsers = onSnapshot(collection(db, 'artifacts', APP_ID, 'public', 'data', 'users'), snap => {
+      const users = []; snap.forEach(d => users.push({ id: d.id, ...d.data() }))
+      setAppState(s => ({ ...s, users }))
+    })
+    const unsubShops = onSnapshot(collection(db, 'artifacts', APP_ID, 'public', 'data', 'shops'), snap => {
+      const shops = []; snap.forEach(d => shops.push({ id: d.id, ...d.data() }))
+      setAppState(s => ({ ...s, shops }))
+    })
+    const unsubReqs = onSnapshot(collection(db, 'artifacts', APP_ID, 'public', 'data', 'requests'), snap => {
+      const requests = []; snap.forEach(d => requests.push({ id: d.id, ...d.data() }))
+      setAppState(s => ({ ...s, requests }))
+    })
+    const unsubRetail = onSnapshot(collection(db, 'artifacts', APP_ID, 'public', 'data', 'retail_map'), snap => {
+      const retailMap = []; snap.forEach(d => retailMap.push({ id: d.id, ...d.data() }))
+      setAppState(s => ({ ...s, retailMap }))
+    })
 
     return () => { unsubAuth(); unsubMat(); unsubUsers(); unsubShops(); unsubReqs(); unsubRetail() }
   }, [])
@@ -207,68 +182,51 @@ export default function App() {
     setPage('home')
   }
 
-  // ── While Firebase is rehydrating the token, show splash ─────────────────
-  if (!authReady) return <AuthSplash dark={dark} />
+  const dismissApprovalBanner = async () => {
+    if (approvalBanner?.notifId) {
+      try {
+        await deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'approval_notifications', approvalBanner.notifId))
+      } catch (e) { /* ignore */ }
+    }
+    setApprovalBanner(null)
+  }
 
-  const bg     = dark ? '#0a0a0a' : '#fafafa'
-  const text   = dark ? '#fff'    : '#111'
+  if (!authReady) return <><GlobalStyles /><AuthSplash dark={dark} /></>
+
+  const bg = dark ? '#0a0a0a' : '#fafafa'; const text = dark ? '#fff' : '#111'
   const border = dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'
 
   return (
     <div style={{ minHeight: '100vh', background: bg, color: text, transition: 'background 0.3s, color 0.3s' }}>
+      <GlobalStyles />
+
+      {/* Approval banner */}
+      {approvalBanner && <ApprovalBanner agentName={approvalBanner.agentName} dark={dark} onDismiss={dismissApprovalBanner} />}
 
       {/* ─── Navbar ── */}
-      <nav style={{
-        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, height: 60,
-        background: dark ? 'rgba(10,10,10,0.96)' : 'rgba(250,250,250,0.96)',
-        backdropFilter: 'blur(14px)', borderBottom: `1px solid ${border}`,
-        display: 'flex', alignItems: 'center',
-      }}>
-        <div style={{
-          maxWidth: 1280, margin: '0 auto', padding: '0 20px',
-          width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        }}>
-          {/* Brand */}
-          <button onClick={() => navigate('home')} style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            fontFamily: ff, fontWeight: 900, fontSize: 18, letterSpacing: '0.15em',
-            textTransform: 'uppercase', color: text,
-            display: 'flex', alignItems: 'center', gap: 10,
-          }}>
+      <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, height: 60, background: dark ? 'rgba(10,10,10,0.96)' : 'rgba(250,250,250,0.96)', backdropFilter: 'blur(14px)', borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center' }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 20px', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <button onClick={() => navigate('home')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: ff, fontWeight: 900, fontSize: 18, letterSpacing: '0.15em', textTransform: 'uppercase', color: text, display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ background: '#ef4444', color: '#fff', padding: '2px 8px', borderRadius: 5, fontSize: 14 }}>PE</span>
             Pyramids Express
           </button>
-
-          {/* Links */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
             <button onClick={toggleDark} style={{ background: 'none', border: 'none', cursor: 'pointer', color: text, opacity: 0.55, padding: 4 }}>
               <Icon name={dark ? 'sun' : 'moon'} size={18} />
             </button>
-
-            <NavLink label="Home"       onClick={() => navigate('home')}       dark={dark} />
-            {appState.isLoggedIn && <NavLink label="Dashboard"  onClick={() => navigate('dashboard')}  dark={dark} />}
+            <NavLink label="Home" onClick={() => navigate('home')} dark={dark} />
+            {appState.isLoggedIn && <NavLink label="Dashboard" onClick={() => navigate('dashboard')} dark={dark} />}
             {appState.isLoggedIn && <NavLink label="Activities" onClick={() => navigate('activities')} dark={dark} active={page === 'activities'} />}
-
             {appState.isAdmin && (
-              <button onClick={() => navigate('admin')} style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                fontFamily: ff, fontWeight: 800, fontSize: 12, letterSpacing: '0.15em',
-                textTransform: 'uppercase', color: '#ef4444',
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-              }}>
+              <button onClick={() => navigate('admin')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: ff, fontWeight: 800, fontSize: 12, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 <Icon name="settings" size={14} /> Management
                 {appState.requests.length > 0 && (
-                  <span style={{
-                    background: '#ef4444', color: '#fff', borderRadius: '50%',
-                    width: 17, height: 17, fontSize: 9,
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900,
-                  }}>
+                  <span style={{ background: '#ef4444', color: '#fff', borderRadius: '50%', width: 17, height: 17, fontSize: 9, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}>
                     {appState.requests.length}
                   </span>
                 )}
               </button>
             )}
-
             {appState.isLoggedIn ? (
               <div style={{ borderLeft: `1px solid ${border}`, paddingLeft: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontFamily: ff, fontWeight: 600, fontSize: 12, textTransform: 'uppercase', opacity: 0.45 }}>
@@ -287,44 +245,25 @@ export default function App() {
 
       {/* ─── Main ── */}
       <main style={{ paddingTop: 60 }}>
-        {/* Auth gate — authReady is true here so no flash */}
         {AUTH_REQUIRED.includes(page) && !appState.isLoggedIn ? (
           <div style={{ textAlign: 'center', padding: '120px 20px' }}>
-            <p style={{
-              fontFamily: ff, fontWeight: 700, fontSize: 14,
-              letterSpacing: '0.2em', textTransform: 'uppercase',
-              color: 'rgba(128,128,128,0.4)', marginBottom: 20,
-            }}>
+            <p style={{ fontFamily: ff, fontWeight: 700, fontSize: 14, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(128,128,128,0.4)', marginBottom: 20 }}>
               Please log in to access this page.
             </p>
             <Btn onClick={() => setAuthOpen(true)} color="red">Agent Login</Btn>
           </div>
         ) : (
           <>
-            {page === 'home' && (
-              <HomePage dark={dark} isLoggedIn={appState.isLoggedIn} onLogin={() => setAuthOpen(true)} onNavigate={navigate} />
-            )}
-            {page === 'dashboard' && (
-              <DashboardPage dark={dark} onNavigate={navigate} appState={appState} />
-            )}
-            {page === 'admin' && appState.isAdmin && (
-              <AdminPage dark={dark} state={appState} onView={setViewer} setToast={setToast} />
-            )}
-            {page === 'activities' && (
-              <ActivitiesPage dark={dark} materials={appState.materials} onBack={() => navigate('dashboard')} onView={setViewer} />
-            )}
-            {page === 'retail-map' && (
-              <RetailMapPage dark={dark} appState={appState} onBack={() => navigate('dashboard')} />
-            )}
-            {['orange-info', 'corporate', 'incentives', 'medical'].includes(page) && (
+            {page === 'home'      && <HomePage      dark={dark} isLoggedIn={appState.isLoggedIn} onLogin={() => setAuthOpen(true)} onNavigate={navigate} />}
+            {page === 'dashboard' && <DashboardPage dark={dark} onNavigate={navigate} appState={appState} />}
+            {page === 'admin'     && appState.isAdmin && <AdminPage dark={dark} state={appState} onView={setViewer} setToast={setToast} />}
+            {page === 'activities'&& <ActivitiesPage dark={dark} materials={appState.materials} onBack={() => navigate('dashboard')} onView={setViewer} />}
+            {page === 'retail-map'&& <RetailMapPage  dark={dark} appState={appState} onBack={() => navigate('dashboard')} />}
+            {['orange-info','corporate','incentives','medical'].includes(page) && (
               <MaterialsPage dark={dark} category={page} materials={appState.materials} onBack={() => navigate('dashboard')} onView={setViewer} />
             )}
-            {page === 'heroes' && (
-              <HeroesPage dark={dark} materials={appState.materials} onBack={() => navigate('home')} onView={setViewer} />
-            )}
-            {page === 'events' && (
-              <EventsPage dark={dark} materials={appState.materials} onBack={() => navigate('home')} onView={setViewer} />
-            )}
+            {page === 'heroes' && <HeroesPage dark={dark} materials={appState.materials} onBack={() => navigate('home')} onView={setViewer} />}
+            {page === 'events' && <EventsPage dark={dark} materials={appState.materials} onBack={() => navigate('home')} onView={setViewer} />}
           </>
         )}
       </main>
@@ -332,11 +271,7 @@ export default function App() {
       {/* ─── Footer ── */}
       <footer style={{ marginTop: 80, padding: '48px 20px', textAlign: 'center', borderTop: `1px solid ${border}`, background: dark ? '#050505' : '#f2f2f2' }}>
         <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginBottom: 22 }}>
-          {[
-            { icon: 'linkedin', href: 'https://www.linkedin.com/company/pyramids-express-orange' },
-            { icon: 'mail',     href: 'mailto:ahmedsharaf.pe@gmail.com' },
-            { icon: 'mapPin',   href: 'https://www.google.com/maps/place/Al+Baramelgi' },
-          ].map(l => (
+          {[{ icon: 'linkedin', href: 'https://www.linkedin.com/company/pyramids-express-orange' }, { icon: 'mail', href: 'mailto:ahmedsharaf.pe@gmail.com' }, { icon: 'mapPin', href: 'https://www.google.com/maps/place/Al+Baramelgi' }].map(l => (
             <a key={l.icon} href={l.href} target="_blank" rel="noreferrer"
               style={{ color: dark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.25)', transition: 'color 0.2s' }}
               onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
@@ -351,24 +286,16 @@ export default function App() {
         </p>
       </footer>
 
-      {authOpen && (
-        <AuthModal dark={dark} shops={appState.shops} onClose={() => setAuthOpen(false)} onLoginSuccess={() => navigate('dashboard')} />
-      )}
-      {viewer && <MediaViewer material={viewer} onClose={() => setViewer(null)} />}
-      {toast  && <Toast {...toast} onClose={() => setToast(null)} />}
+      {authOpen && <AuthModal dark={dark} shops={appState.shops} onClose={() => setAuthOpen(false)} onLoginSuccess={() => navigate('dashboard')} />}
+      {viewer   && <MediaViewer material={viewer} onClose={() => setViewer(null)} />}
+      {toast    && <Toast {...toast} onClose={() => setToast(null)} />}
     </div>
   )
 }
 
 function NavLink({ label, onClick, dark, active }) {
   return (
-    <button onClick={onClick} style={{
-      background: 'none', border: 'none', cursor: 'pointer',
-      fontFamily: ff, fontWeight: 700, fontSize: 12,
-      letterSpacing: '0.15em', textTransform: 'uppercase',
-      color: active ? '#ef4444' : (dark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)'),
-      transition: 'color 0.2s',
-    }}
+    <button onClick={onClick} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: ff, fontWeight: 700, fontSize: 12, letterSpacing: '0.15em', textTransform: 'uppercase', color: active ? '#ef4444' : (dark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)'), transition: 'color 0.2s' }}
       onMouseEnter={e => e.target.style.color = '#ef4444'}
       onMouseLeave={e => { if (!active) e.target.style.color = dark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }}
     >
