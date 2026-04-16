@@ -1,5 +1,11 @@
 import React, { useState } from 'react'
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth'
+import {
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
+} from 'firebase/auth'
 import { doc, setDoc, getDoc } from 'firebase/firestore'
 import { auth, db, APP_ID, authErrorMessage } from './firebase.js'
 import { Icon, Input, Select, Btn, Toast } from './ui.jsx'
@@ -62,8 +68,9 @@ export default function AuthModal({ dark, onClose, onLoginSuccess, shops }) {
   const [toast,     setToast]     = useState(null)
 
   // Login
-  const [email,  setEmail]  = useState('')
-  const [pass,   setPass]   = useState('')
+  const [email,      setEmail]      = useState(() => localStorage.getItem('pe_remembered_email') || '')
+  const [pass,       setPass]       = useState('')
+  const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem('pe_remembered_email'))
 
   // Signup
   const [sName,  setSName]  = useState('')
@@ -92,18 +99,24 @@ export default function AuthModal({ dark, onClose, onLoginSuccess, shops }) {
     if (!trimEmail || !pass) return
     setLoading(true)
     try {
+      // Set persistence BEFORE signing in based on the Remember Me choice:
+      // - Checked  → browserLocalPersistence  (survives tab close & browser restart)
+      // - Unchecked → browserSessionPersistence (cleared when tab/browser closes)
+      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence)
+
       await signInWithEmailAndPassword(auth, trimEmail, pass)
+
+      // Save or clear the remembered email
+      if (rememberMe) {
+        localStorage.setItem('pe_remembered_email', trimEmail)
+      } else {
+        localStorage.removeItem('pe_remembered_email')
+      }
+
       onLoginSuccess()
       onClose()
     } catch (err) {
-      // Check if user's request is still pending — give a helpful message
       if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-        // Check if they have a pending request
-        try {
-          const reqSnaps = await getDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'pending_check', 'dummy'))
-          // We can't easily query by email client-side without extra index,
-          // so show a general "not found or pending" message
-        } catch {}
         setToast({ message: 'Account not found. If you applied recently, your account may still be pending admin approval.', type: 'error' })
       } else {
         setToast({ message: authErrorMessage(err), type: 'error' })
@@ -200,6 +213,42 @@ export default function AuthModal({ dark, onClose, onLoginSuccess, shops }) {
                 onChange={e => setEmail(e.target.value)} required dark={dark} />
               <Input type="password" placeholder="Password" value={pass}
                 onChange={e => setPass(e.target.value)} required dark={dark} />
+
+              {/* Remember Me */}
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                cursor: 'pointer', userSelect: 'none',
+                padding: '2px 0',
+              }}>
+                <div
+                  onClick={() => setRememberMe(v => !v)}
+                  style={{
+                    width: 18, height: 18, borderRadius: 5, flexShrink: 0,
+                    border: `2px solid ${rememberMe ? '#ef4444' : (dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)')}`,
+                    background: rememberMe ? '#ef4444' : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'all 0.18s',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {rememberMe && (
+                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                      <path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </div>
+                <span
+                  onClick={() => setRememberMe(v => !v)}
+                  style={{
+                    fontFamily: ff, fontWeight: 700, fontSize: 11,
+                    letterSpacing: '0.1em', textTransform: 'uppercase',
+                    color: dark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.5)',
+                  }}
+                >
+                  Remember me on this device
+                </span>
+              </label>
+
               <Btn type="submit" color="black" full disabled={loading || !email || !pass}>
                 {loading ? 'Signing in…' : 'Sign In'}
               </Btn>
