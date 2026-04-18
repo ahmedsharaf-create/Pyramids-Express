@@ -336,7 +336,7 @@ export default function AdminPage({ dark, state, onView, setToast }) {
                 <option value="">SELECT SHOP</option>
                 {shopsForCreate.map(s => <option key={s} value={s}>{s}</option>)}
               </Select>
-              <Btn type="submit" color="blue" full disabled={loading}>
+              <Btn type="submit" color="red" full disabled={loading}>
                 {loading ? 'Creating…' : 'Create Agent Account'}
               </Btn>
             </form>
